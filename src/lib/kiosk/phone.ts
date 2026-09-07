@@ -1,11 +1,6 @@
-/** 僅保留數字，台灣手機可含國碼 886 */
-export const normalizePhoneDigits = (value: string): string => {
-  let digits = String(value ?? "").replace(/\D/g, "");
-  if (digits.startsWith("886") && digits.length >= 11) {
-    digits = `0${digits.slice(3)}`;
-  }
-  return digits;
-};
+/** 僅保留數字，不做國碼轉換（如 0958255908） */
+export const normalizePhoneDigits = (value: string): string =>
+  String(value ?? "").replace(/\D/g, "");
 
 export const looksLikePhone = (value: string): boolean => {
   const digits = normalizePhoneDigits(value);

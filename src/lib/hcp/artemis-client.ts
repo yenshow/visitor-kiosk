@@ -94,7 +94,7 @@ export const artemisPostSecure = async <T = unknown>(
               typeof data === "string"
                 ? data.slice(0, 200)
                 : JSON.stringify(data).slice(0, 200);
-            reject(new Error(`YSOP HTTP ${status}: ${hint || "請求失敗"}`));
+            reject(new Error(`YSCP HTTP ${status}: ${hint || "請求失敗"}`));
             return;
           }
 
@@ -105,7 +105,7 @@ export const artemisPostSecure = async <T = unknown>(
     req.on("error", reject);
     req.on("timeout", () => {
       req.destroy();
-      reject(new Error("YSOP 連線逾時"));
+      reject(new Error("YSCP 連線逾時"));
     });
     req.write(payload);
     req.end();

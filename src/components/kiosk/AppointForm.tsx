@@ -1,12 +1,10 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useState } from "react";
 import { FlowCard } from "@/components/kiosk/FlowCard";
 import { IdleCountdown } from "@/components/kiosk/IdleCountdown";
-import {
-  HostPicker,
-  type HostPerson,
-} from "@/components/kiosk/HostPicker";
+import { HostPicker, type HostPerson } from "@/components/kiosk/HostPicker";
+import { normalizePlateNo } from "@/lib/kiosk/plate";
 import { isValidEmail } from "@/lib/kiosk/visitor-fields";
 import { VISIT_REASON_OPTIONS } from "@/lib/kiosk/visit-reason";
 
@@ -31,6 +29,9 @@ const defaultDateTimes = () => {
   };
 };
 
+const FIELD_CLASS =
+  "min-h-14 w-full rounded-xl border border-slate-300 bg-white px-4 text-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30";
+
 /** datetime-local（假設現場為台北時區）→ ISO 8601 +08:00 */
 const toTaipeiIsoFromLocal = (value: string): string => {
   if (!value) return "";
@@ -39,53 +40,37 @@ const toTaipeiIsoFromLocal = (value: string): string => {
 };
 
 export const AppointForm = ({ idleSeconds, onHome }: AppointFormProps) => {
-  const defaults = useMemo(() => defaultDateTimes(), []);
-  const [visitorName, setVisitorName] = useState("");
+  const [familyName, setFamilyName] = useState("");
+  const [givenName, setGivenName] = useState("");
   const [email, setEmail] = useState("");
   const [company, setCompany] = useState("");
   const [phone, setPhone] = useState("");
+  const [plateNo, setPlateNo] = useState("");
   const [reasonType, setReasonType] = useState(0);
-  const [startAt, setStartAt] = useState(defaults.start);
-  const [endAt, setEndAt] = useState(defaults.end);
+  const [startAt, setStartAt] = useState(() => defaultDateTimes().start);
+  const [endAt, setEndAt] = useState(() => defaultDateTimes().end);
   const [selectedHost, setSelectedHost] = useState<HostPerson | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [waitingMessage, setWaitingMessage] = useState("");
 
-  const handleHostError = useCallback((message: string) => {
-    setError(message);
-  }, []);
-
-  const handleSelectHost = useCallback((host: HostPerson | null) => {
-    setSelectedHost(host);
-  }, []);
-
   const phoneDigits = phone.replace(/\D/g, "");
   const emailTrimmed = email.trim();
+  const familyNameTrimmed = familyName.trim();
+  const givenNameTrimmed = givenName.trim();
   const canSubmit = Boolean(
-    visitorName.trim() &&
-      isValidEmail(emailTrimmed) &&
-      phoneDigits.length >= 8 &&
-      selectedHost &&
-      startAt &&
-      endAt &&
-      startAt < endAt,
+    (familyNameTrimmed || givenNameTrimmed) &&
+    isValidEmail(emailTrimmed) &&
+    phoneDigits.length >= 8 &&
+    phoneDigits.length <= 15 &&
+    selectedHost &&
+    startAt &&
+    endAt &&
+    startAt < endAt,
   );
 
   const handleSubmit = async () => {
-    if (!selectedHost) return;
-    if (!canSubmit) {
-      if (!isValidEmail(emailTrimmed)) {
-        setError("請填寫正確的 Email");
-        return;
-      }
-      setError(
-        startAt && endAt && startAt >= endAt
-          ? "結束時間須晚於開始時間"
-          : "請完整填寫預約資料",
-      );
-      return;
-    }
+    if (!canSubmit || !selectedHost) return;
 
     setSubmitting(true);
     setError("");
@@ -98,11 +83,13 @@ export const AppointForm = ({ idleSeconds, onHome }: AppointFormProps) => {
           appointStartTime: toTaipeiIsoFromLocal(startAt),
           appointEndTime: toTaipeiIsoFromLocal(endAt),
           visitReasonType: reasonType,
-          visitorName: visitorName.trim(),
+          visitorFamilyName: familyNameTrimmed,
+          visitorGivenName: givenNameTrimmed,
           companyName: company.trim(),
           phoneNo: phoneDigits,
           email: emailTrimmed,
           gender: 0,
+          plateNo: normalizePlateNo(plateNo) || undefined,
         }),
       });
       const json = (await res.json()) as {
@@ -149,19 +136,31 @@ export const AppointForm = ({ idleSeconds, onHome }: AppointFormProps) => {
 
   return (
     <FlowCard title="訪客預約" onBack={onHome}>
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-2">
         <label className="block">
           <span className="mb-1 block text-sm font-medium text-slate-600">
-            姓名 <span className="text-red-600">*</span>
+            姓
           </span>
           <input
-            className="min-h-16 w-full rounded-xl border border-slate-300 px-4 text-xl"
-            value={visitorName}
-            onChange={(e) => setVisitorName(e.target.value)}
-            autoComplete="name"
+            className={FIELD_CLASS}
+            value={familyName}
+            onChange={(e) => setFamilyName(e.target.value)}
+            autoComplete="family-name"
             enterKeyHint="next"
-            aria-label="訪客姓名"
-            aria-required="true"
+            aria-label="訪客姓"
+          />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-sm font-medium text-slate-600">
+            名
+          </span>
+          <input
+            className={FIELD_CLASS}
+            value={givenName}
+            onChange={(e) => setGivenName(e.target.value)}
+            autoComplete="given-name"
+            enterKeyHint="next"
+            aria-label="訪客名"
           />
         </label>
         <label className="block">
@@ -170,7 +169,7 @@ export const AppointForm = ({ idleSeconds, onHome }: AppointFormProps) => {
           </span>
           <input
             type="email"
-            className="min-h-16 w-full rounded-xl border border-slate-300 px-4 text-xl"
+            className={FIELD_CLASS}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             autoComplete="email"
@@ -186,7 +185,7 @@ export const AppointForm = ({ idleSeconds, onHome }: AppointFormProps) => {
             公司
           </span>
           <input
-            className="min-h-16 w-full rounded-xl border border-slate-300 px-4 text-xl"
+            className={FIELD_CLASS}
             value={company}
             onChange={(e) => setCompany(e.target.value)}
             autoComplete="organization"
@@ -199,23 +198,44 @@ export const AppointForm = ({ idleSeconds, onHome }: AppointFormProps) => {
             手機號碼 <span className="text-red-600">*</span>
           </span>
           <input
-            className="min-h-16 w-full rounded-xl border border-slate-300 px-4 text-xl"
+            className={FIELD_CLASS}
             value={phone}
-            onChange={(e) => setPhone(e.target.value.replace(/[^\d+\-\s]/g, ""))}
+            onChange={(e) =>
+              setPhone(e.target.value.replace(/[^\d+\-\s]/g, ""))
+            }
             inputMode="tel"
             autoComplete="tel"
             enterKeyHint="next"
             maxLength={20}
-            placeholder="0912-345-678"
+            placeholder="0912345678"
             aria-label="手機號碼"
             aria-required="true"
+          />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-sm font-medium text-slate-600">
+            車牌
+          </span>
+          <input
+            className={`${FIELD_CLASS} uppercase tracking-wide`}
+            value={plateNo}
+            onChange={(e) =>
+              setPlateNo(
+                e.target.value.replace(/[^a-zA-Z0-9\-]/g, "").toUpperCase(),
+              )
+            }
+            autoComplete="off"
+            enterKeyHint="next"
+            maxLength={12}
+            placeholder="ABC1234"
+            aria-label="車牌號碼"
           />
         </label>
         <div className="block sm:col-span-2">
           <HostPicker
             selectedHost={selectedHost}
-            onSelect={handleSelectHost}
-            onError={handleHostError}
+            onSelect={setSelectedHost}
+            onError={setError}
           />
         </div>
         <div className="block sm:col-span-2">
@@ -235,7 +255,7 @@ export const AppointForm = ({ idleSeconds, onHome }: AppointFormProps) => {
                   type="button"
                   role="radio"
                   aria-checked={selected}
-                  className={`min-h-14 rounded-xl border px-3 text-lg font-semibold active:scale-[0.98] ${
+                  className={`min-h-12 rounded-xl border px-3 text-lg font-semibold active:scale-[0.98] ${
                     selected
                       ? "border-blue-600 bg-blue-600 text-white"
                       : "border-slate-300 bg-white text-slate-800"
@@ -254,7 +274,7 @@ export const AppointForm = ({ idleSeconds, onHome }: AppointFormProps) => {
           </span>
           <input
             type="datetime-local"
-            className="min-h-16 w-full rounded-xl border border-slate-300 px-4 text-lg"
+            className={`${FIELD_CLASS} text-lg`}
             value={startAt}
             onChange={(e) => setStartAt(e.target.value)}
             aria-label="開始日期時間"
@@ -266,7 +286,7 @@ export const AppointForm = ({ idleSeconds, onHome }: AppointFormProps) => {
           </span>
           <input
             type="datetime-local"
-            className="min-h-16 w-full rounded-xl border border-slate-300 px-4 text-lg"
+            className={`${FIELD_CLASS} text-lg`}
             value={endAt}
             onChange={(e) => setEndAt(e.target.value)}
             aria-label="結束日期時間"
@@ -275,14 +295,14 @@ export const AppointForm = ({ idleSeconds, onHome }: AppointFormProps) => {
       </div>
 
       {error ? (
-        <p className="mt-4 text-lg text-red-600" role="alert">
+        <p className="mt-3 text-lg text-red-600" role="alert">
           {error}
         </p>
       ) : null}
 
       <button
         type="button"
-        className={`mt-6 min-h-16 w-full rounded-2xl text-xl font-bold ${
+        className={`mt-4 min-h-14 w-full rounded-2xl text-xl font-bold ${
           !canSubmit || submitting
             ? "cursor-not-allowed bg-slate-300 text-slate-500"
             : "bg-blue-600 text-white active:bg-blue-700"

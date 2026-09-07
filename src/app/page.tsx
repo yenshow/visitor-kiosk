@@ -5,7 +5,10 @@ import { useEffect, useState } from "react";
 import { AppointForm } from "@/components/kiosk/AppointForm";
 import { CheckinFlow } from "@/components/kiosk/CheckinFlow";
 import { CheckoutFlow } from "@/components/kiosk/CheckoutFlow";
-import { HomeActionCards } from "@/components/kiosk/HomeActionCards";
+import {
+  HomeActionCards,
+  type KioskStatsView,
+} from "@/components/kiosk/HomeActionCards";
 import { KioskShell } from "@/components/kiosk/KioskShell";
 
 type Screen = "home" | "appoint" | "checkin" | "checkout";
@@ -20,6 +23,7 @@ const parseIdleSeconds = (): number => {
 };
 
 const IDLE_SECONDS = parseIdleSeconds();
+const STATS_POLL_MS = 20_000;
 
 const FlowPanel = ({
   children,
@@ -28,9 +32,13 @@ const FlowPanel = ({
   children: ReactNode;
   wide?: boolean;
 }) => (
-  <div className="flex min-h-0 w-full flex-1 overflow-auto">
-    <div className={`m-auto w-full ${wide ? "max-w-3xl" : "max-w-2xl"}`}>
-      {children}
+  <div className="min-h-0 w-full flex-1 overflow-y-auto">
+    <div className="flex min-h-full flex-col justify-center">
+      <div
+        className={`mx-auto w-full ${wide ? "max-w-3xl" : "max-w-2xl"}`}
+      >
+        {children}
+      </div>
     </div>
   </div>
 );
@@ -38,6 +46,7 @@ const FlowPanel = ({
 export default function HomePage() {
   const [screen, setScreen] = useState<Screen>("home");
   const [status, setStatus] = useState<StatusInfo | null>(null);
+  const [stats, setStats] = useState<KioskStatsView | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -56,6 +65,31 @@ export default function HomePage() {
     };
   }, []);
 
+  useEffect(() => {
+    if (screen !== "home") return;
+
+    let cancelled = false;
+    const loadStats = async () => {
+      try {
+        const res = await fetch("/api/kiosk/stats");
+        const json = (await res.json()) as { data?: KioskStatsView };
+        if (!cancelled && json.data) setStats(json.data);
+      } catch {
+        // ignore
+      }
+    };
+
+    void loadStats();
+    const timer = window.setInterval(() => {
+      void loadStats();
+    }, STATS_POLL_MS);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [screen]);
+
   const handleGoHome = () => setScreen("home");
   const handleOpenCheckin = () => setScreen("checkin");
   const handleOpenCheckout = () => setScreen("checkout");
@@ -68,6 +102,7 @@ export default function HomePage() {
     >
       {screen === "home" ? (
         <HomeActionCards
+          stats={stats}
           onCheckin={handleOpenCheckin}
           onCheckout={handleOpenCheckout}
           onAppoint={handleOpenAppoint}

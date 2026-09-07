@@ -1,43 +1,21 @@
-/** HCP registerment／appointment 不接受空的 visitorGivenName，無名時用此佔位 */
-export const HCP_EMPTY_GIVEN = "-";
+/** YSCP OpenAPI 不接受空的姓或名；Kiosk／Web 二選一時寫入用此佔位 */
+export const HCP_EMPTY_NAME = "-";
 
-/**
- * Kiosk 單欄「姓名」→ HCP 姓／名。
- * 整段寫入姓；名固定佔位（OpenAPI 不接受空名）。
- */
-export const mapVisitorName = (
-  fullName: string,
-): { visitorFamilyName: string; visitorGivenName: string } => {
-  const name = fullName.trim();
+export const toHcpVisitorNames = (info: {
+  visitorFamilyName?: string;
+  visitorGivenName?: string;
+}): { visitorFamilyName: string; visitorGivenName: string } => {
+  const family = String(info.visitorFamilyName ?? "").trim();
+  const given = String(info.visitorGivenName ?? "").trim();
   return {
-    visitorFamilyName: name,
-    visitorGivenName: HCP_EMPTY_GIVEN,
+    visitorFamilyName: family || HCP_EMPTY_NAME,
+    visitorGivenName: given || HCP_EMPTY_NAME,
   };
 };
 
-/**
- * 報到送出前正規化：
- * HCP 畫面只填姓時，API 可能把值放在 given、family 為空。
- */
-export const normalizeRegisterNames = (info: {
-  visitorFamilyName?: string;
-  visitorGivenName?: string;
-  visitorName?: string;
-}): { visitorFamilyName: string; visitorGivenName: string } => {
-  const family = String(info.visitorFamilyName ?? "").trim();
-  const rawGiven = String(info.visitorGivenName ?? "").trim();
-  const given = rawGiven === HCP_EMPTY_GIVEN ? "" : rawGiven;
-  const full = String(info.visitorName ?? "").trim();
-
-  const visitorFamilyName = family || given || full;
-  if (!visitorFamilyName) {
-    throw new Error("訪客姓名資料不完整，請洽接待人員");
-  }
-
-  return {
-    visitorFamilyName,
-    visitorGivenName: family && given ? given : HCP_EMPTY_GIVEN,
-  };
+const visibleNamePart = (value?: string): string => {
+  const text = String(value ?? "").trim();
+  return text === HCP_EMPTY_NAME ? "" : text;
 };
 
 export const displayVisitorName = (
@@ -45,12 +23,10 @@ export const displayVisitorName = (
   givenName?: string,
   visitorName?: string,
 ): string => {
-  const family = String(familyName ?? "").trim();
-  const given = String(givenName ?? "").trim();
-  const givenShow = given === HCP_EMPTY_GIVEN ? "" : given;
-  const full = String(visitorName ?? "").trim();
-  if (family || givenShow) return `${family}${givenShow}`;
-  return full.split(HCP_EMPTY_GIVEN).join("").trim() || "—";
+  const family = visibleNamePart(familyName);
+  const given = visibleNamePart(givenName);
+  if (family || given) return `${family}${given}`;
+  return visibleNamePart(visitorName) || "—";
 };
 
 export const isValidEmail = (value: string): boolean =>

@@ -25,6 +25,9 @@
 .DS_Store
 *.pem
 
+# YSOP 現場狀態（運行時寫入）
+/data/kiosk-presence.json
+
 # debug
 npm-debug.log*
 yarn-debug.log*

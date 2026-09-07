@@ -3,20 +3,22 @@ import {
   getAutomaticApproval,
 } from "@/lib/hcp/visitor-api";
 import { jsonError, jsonOk } from "@/lib/kiosk/api-helpers";
+import { normalizePlateNo } from "@/lib/kiosk/plate";
 import { normalizePhoneDigits } from "@/lib/kiosk/phone";
-import { isValidEmail, mapVisitorName } from "@/lib/kiosk/visitor-fields";
+import { isValidEmail } from "@/lib/kiosk/visitor-fields";
 
 type AppointBody = {
   receptionistId?: string;
   appointStartTime?: string;
   appointEndTime?: string;
   visitReasonType?: number;
+  visitorFamilyName?: string;
   visitorGivenName?: string;
-  visitorName?: string;
   companyName?: string;
   phoneNo?: string;
   email?: string;
   gender?: number;
+  plateNo?: string;
 };
 
 export const POST = async (request: Request) => {
@@ -24,18 +26,20 @@ export const POST = async (request: Request) => {
     const body = (await request.json()) as AppointBody;
 
     const receptionistId = String(body.receptionistId ?? "").trim();
-    const fullName = String(
-      body.visitorGivenName ?? body.visitorName ?? "",
-    ).trim();
+    const visitorFamilyName = String(body.visitorFamilyName ?? "").trim();
+    const visitorGivenName = String(body.visitorGivenName ?? "").trim();
     const appointStartTime = String(body.appointStartTime ?? "").trim();
     const appointEndTime = String(body.appointEndTime ?? "").trim();
     const visitReasonType = Number(body.visitReasonType ?? 0);
     const companyName = String(body.companyName ?? "").trim();
     const email = String(body.email ?? "").trim();
     const phoneNo = normalizePhoneDigits(String(body.phoneNo ?? "").trim());
+    const plateNo = normalizePlateNo(body.plateNo);
 
     if (!receptionistId) return jsonError("請選擇被訪人");
-    if (!fullName) return jsonError("請填寫訪客姓名");
+    if (!visitorFamilyName && !visitorGivenName) {
+      return jsonError("請填寫姓或名");
+    }
     if (!email) return jsonError("請填寫 Email");
     if (!isValidEmail(email)) return jsonError("Email 格式不正確");
     if (!phoneNo) return jsonError("請填寫手機號碼");
@@ -48,8 +52,6 @@ export const POST = async (request: Request) => {
     if (appointStartTime >= appointEndTime) {
       return jsonError("結束時間須晚於開始時間");
     }
-
-    const { visitorFamilyName, visitorGivenName } = mapVisitorName(fullName);
 
     const result = await createAppointment({
       receptionistId,
@@ -64,6 +66,7 @@ export const POST = async (request: Request) => {
         phoneNo,
         email,
         gender: typeof body.gender === "number" ? body.gender : 0,
+        ...(plateNo ? { plateNo } : {}),
       },
     });
 

@@ -6,12 +6,17 @@ import { IdleCountdown } from "@/components/kiosk/IdleCountdown";
 import { NumericKeypad } from "@/components/kiosk/NumericKeypad";
 import { formatDateTimeRange } from "@/lib/kiosk/format";
 
+type Presence = "on_site" | "temp_out";
+type CheckoutMode = "temp" | "return" | "final";
+
 type CheckoutRecordView = {
   token: string;
   visitorName: string;
   phoneNo: string;
   companyName: string;
   receptionistName: string;
+  plateNo?: string;
+  presence: Presence;
   visitStartTime: string;
   visitEndTime: string;
   visitingTime?: string;
@@ -22,20 +27,45 @@ type CheckoutFlowProps = {
   onHome: () => void;
 };
 
+const DONE_TITLE: Record<CheckoutMode, string> = {
+  temp: "已登記臨時外出",
+  return: "已確認返回",
+  final: "正式簽退成功",
+};
+
 export const CheckoutFlow = ({ idleSeconds, onHome }: CheckoutFlowProps) => {
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [selected, setSelected] = useState<CheckoutRecordView | null>(null);
-  const [checkingOut, setCheckingOut] = useState(false);
-  const [done, setDone] = useState(false);
+  const [records, setRecords] = useState<CheckoutRecordView[]>([]);
+  const [selectedTokens, setSelectedTokens] = useState<string[]>([]);
+  const [acting, setActing] = useState(false);
+  const [doneMode, setDoneMode] = useState<CheckoutMode | null>(null);
+  const [doneMessage, setDoneMessage] = useState("");
 
-  const canQuery = useMemo(() => code.trim().length > 0, [code]);
+  const canQuery = code.trim().length > 0;
+  const selected = useMemo(
+    () => records.filter((item) => selectedTokens.includes(item.token)),
+    [records, selectedTokens],
+  );
+  const allTempOut =
+    selected.length > 0 &&
+    selected.every((item) => item.presence === "temp_out");
+  const allOnSite =
+    selected.length > 0 &&
+    selected.every((item) => item.presence === "on_site");
+
+  const handleResetQuery = () => {
+    setError("");
+    setRecords([]);
+    setSelectedTokens([]);
+  };
 
   const handleLookup = async (query: string) => {
     setLoading(true);
     setError("");
-    setSelected(null);
+    setRecords([]);
+    setSelectedTokens([]);
     try {
       const res = await fetch("/api/kiosk/checkout/lookup", {
         method: "POST",
@@ -50,12 +80,19 @@ export const CheckoutFlow = ({ idleSeconds, onHome }: CheckoutFlowProps) => {
         setError(json.msg || "查詢失敗");
         return;
       }
-      const list = json.data?.records ?? [];
+      const list = (json.data?.records ?? []).map((item) => ({
+        ...item,
+        presence:
+          item.presence === "temp_out"
+            ? ("temp_out" as const)
+            : ("on_site" as const),
+      }));
       if (list.length === 0) {
         setError("查無在廠簽到記錄，請確認已報到或洽接待人員");
         return;
       }
-      setSelected(list[0]);
+      setRecords(list);
+      setSelectedTokens(list.length === 1 ? [list[0].token] : []);
     } catch {
       setError("查詢失敗");
     } finally {
@@ -63,35 +100,60 @@ export const CheckoutFlow = ({ idleSeconds, onHome }: CheckoutFlowProps) => {
     }
   };
 
-  const handleCheckout = async (record: CheckoutRecordView) => {
-    setCheckingOut(true);
+  const handleToggle = (token: string) => {
+    setSelectedTokens((prev) =>
+      prev.includes(token)
+        ? prev.filter((item) => item !== token)
+        : [...prev, token],
+    );
+  };
+
+  const handleAction = async (mode: CheckoutMode) => {
+    if (selected.length === 0) {
+      setError("請選擇至少一位訪客");
+      return;
+    }
+    if (!allOnSite && !allTempOut) {
+      setError("請分開處理「在場」與「臨時外出」的訪客");
+      return;
+    }
+
+    setActing(true);
     setError("");
     try {
-      const res = await fetch("/api/kiosk/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: record.token }),
-      });
-      const json = (await res.json()) as { msg?: string };
-      if (!res.ok) {
-        setError(json.msg || "簽退失敗");
-        return;
+      let message = "";
+      for (const record of selected) {
+        const res = await fetch("/api/kiosk/checkout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: record.token, mode }),
+        });
+        const json = (await res.json()) as {
+          msg?: string;
+          data?: { message?: string };
+        };
+        if (!res.ok) {
+          setError(json.msg || "操作失敗");
+          return;
+        }
+        message = json.data?.message || message;
       }
-      setDone(true);
+      setDoneMessage(message);
+      setDoneMode(mode);
     } catch {
-      setError("簽退失敗");
+      setError("操作失敗");
     } finally {
-      setCheckingOut(false);
+      setActing(false);
     }
   };
 
-  if (done) {
+  if (doneMode) {
     return (
       <div className="mx-auto flex w-full max-w-2xl flex-col items-center rounded-3xl bg-white p-10 shadow-xl">
-        <h2 className="text-3xl font-bold text-emerald-700">簽退成功</h2>
-        <p className="mt-3 text-center text-lg text-slate-600">
-          通行權限已撤銷，感謝您的來訪
-        </p>
+        <h2 className="text-3xl font-bold text-emerald-700">
+          {DONE_TITLE[doneMode]}
+        </h2>
+        <p className="mt-3 text-center text-lg text-slate-600">{doneMessage}</p>
         <button
           type="button"
           className="mt-8 min-h-16 rounded-xl bg-slate-800 px-8 text-xl font-semibold text-white active:bg-slate-700"
@@ -105,7 +167,7 @@ export const CheckoutFlow = ({ idleSeconds, onHome }: CheckoutFlowProps) => {
     );
   }
 
-  if (error && !selected) {
+  if (error && records.length === 0) {
     return (
       <div className="mx-auto flex w-full max-w-2xl flex-col items-center rounded-3xl bg-white p-10 shadow-xl">
         <h2 className="text-3xl font-bold text-slate-900">無法簽退</h2>
@@ -117,10 +179,7 @@ export const CheckoutFlow = ({ idleSeconds, onHome }: CheckoutFlowProps) => {
             type="button"
             className="min-h-16 rounded-xl border border-slate-300 px-6 text-lg font-semibold text-slate-700 active:bg-slate-50"
             aria-label="再試一次"
-            onClick={() => {
-              setError("");
-              setSelected(null);
-            }}
+            onClick={handleResetQuery}
           >
             再試一次
           </button>
@@ -138,9 +197,11 @@ export const CheckoutFlow = ({ idleSeconds, onHome }: CheckoutFlowProps) => {
     );
   }
 
+  const actionDisabled = acting || selected.length === 0;
+
   return (
     <FlowCard title="訪客簽退" onBack={onHome}>
-      {!selected ? (
+      {records.length === 0 ? (
         <>
           <label className="block">
             <span className="mb-2 block text-sm font-medium text-slate-600">
@@ -172,44 +233,76 @@ export const CheckoutFlow = ({ idleSeconds, onHome }: CheckoutFlowProps) => {
             disabled={!canQuery || loading}
             onClick={() => void handleLookup(code.trim())}
           >
-            {loading ? "查詢中…" : "查詢並簽退"}
+            {loading ? "查詢中…" : "查詢"}
           </button>
         </>
       ) : (
         <>
-          <div className="space-y-4 rounded-2xl bg-slate-50 p-6 text-xl text-slate-800">
-            <p>
-              <span className="text-slate-500">訪客：</span>
-              {selected.visitorName}
-            </p>
-            {selected.phoneNo ? (
-              <p>
-                <span className="text-slate-500">電話：</span>
-                {selected.phoneNo}
-              </p>
-            ) : null}
-            {selected.companyName ? (
-              <p>
-                <span className="text-slate-500">公司：</span>
-                {selected.companyName}
-              </p>
-            ) : null}
-            {selected.receptionistName ? (
-              <p>
-                <span className="text-slate-500">被訪人：</span>
-                {selected.receptionistName}
-              </p>
-            ) : null}
-            <p>
-              <span className="text-slate-500">來訪時間：</span>
-              {selected.visitStartTime || selected.visitEndTime
-                ? formatDateTimeRange(
-                    selected.visitStartTime,
-                    selected.visitEndTime,
-                  )
-                : selected.visitingTime || "—"}
-            </p>
-          </div>
+          <p className="mb-3 text-lg text-slate-600">
+            {records.length > 1
+              ? "找到多位在廠訪客（共乘請勾選要處理的人）"
+              : "請確認訪客資料後選擇操作"}
+          </p>
+
+          <ul className="space-y-3" role="list">
+            {records.map((item) => {
+              const checked = selectedTokens.includes(item.token);
+              return (
+                <li key={item.token}>
+                  <button
+                    type="button"
+                    role="checkbox"
+                    aria-checked={checked}
+                    aria-label={`選擇訪客 ${item.visitorName}`}
+                    className={`min-h-20 w-full rounded-xl border px-4 py-4 text-left transition active:scale-[0.99] ${
+                      checked
+                        ? "border-amber-500 bg-amber-50"
+                        : "border-slate-200 bg-slate-50"
+                    }`}
+                    onClick={() => handleToggle(item.token)}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-xl font-semibold text-slate-900">
+                          {item.visitorName}
+                        </div>
+                        <div className="mt-1 text-base text-slate-600">
+                          電話：{item.phoneNo || "—"}
+                        </div>
+                        {item.plateNo ? (
+                          <div className="mt-1 text-base text-slate-600">
+                            車牌：{item.plateNo}
+                          </div>
+                        ) : null}
+                        {item.receptionistName ? (
+                          <div className="mt-1 text-base text-slate-600">
+                            被訪人：{item.receptionistName}
+                          </div>
+                        ) : null}
+                        <div className="mt-1 text-sm text-slate-500">
+                          {item.visitStartTime || item.visitEndTime
+                            ? formatDateTimeRange(
+                                item.visitStartTime,
+                                item.visitEndTime,
+                              )
+                            : item.visitingTime || "—"}
+                        </div>
+                      </div>
+                      <span
+                        className={`shrink-0 rounded-full px-3 py-1 text-sm font-semibold ${
+                          item.presence === "temp_out"
+                            ? "bg-orange-100 text-orange-800"
+                            : "bg-emerald-100 text-emerald-800"
+                        }`}
+                      >
+                        {item.presence === "temp_out" ? "臨時外出" : "在場"}
+                      </span>
+                    </div>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
 
           {error ? (
             <p className="mt-4 text-lg text-red-600" role="alert">
@@ -217,28 +310,55 @@ export const CheckoutFlow = ({ idleSeconds, onHome }: CheckoutFlowProps) => {
             </p>
           ) : null}
 
-          <div className="mt-6 flex gap-3">
+          <div className="mt-6 flex flex-col gap-3">
             <button
               type="button"
-              className="min-h-16 flex-1 rounded-xl border border-slate-300 text-xl font-semibold text-slate-700 active:bg-slate-50 disabled:opacity-50"
+              className="min-h-14 w-full rounded-xl border border-slate-300 text-lg font-semibold text-slate-700 active:bg-slate-50 disabled:opacity-50"
               aria-label="重新查詢"
-              disabled={checkingOut}
-              onClick={() => {
-                setSelected(null);
-                setError("");
-              }}
+              disabled={acting}
+              onClick={handleResetQuery}
             >
               重新查詢
             </button>
-            <button
-              type="button"
-              className="min-h-16 flex-1 rounded-xl bg-amber-600 text-xl font-bold text-white active:bg-amber-700 disabled:bg-slate-300"
-              aria-label="確認簽退"
-              disabled={checkingOut}
-              onClick={() => void handleCheckout(selected)}
-            >
-              {checkingOut ? "簽退中…" : "確認簽退"}
-            </button>
+
+            {allOnSite || allTempOut ? (
+              <div className="flex gap-3">
+                {allOnSite ? (
+                  <button
+                    type="button"
+                    className="min-h-16 flex-1 rounded-xl border-2 border-orange-500 bg-white text-xl font-bold text-orange-700 active:bg-orange-50 disabled:bg-slate-100 disabled:text-slate-400"
+                    aria-label="臨時外出"
+                    disabled={actionDisabled}
+                    onClick={() => void handleAction("temp")}
+                  >
+                    {acting ? "處理中…" : "臨時外出"}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="min-h-16 flex-1 rounded-xl border-2 border-emerald-600 bg-white text-xl font-bold text-emerald-700 active:bg-emerald-50 disabled:bg-slate-100 disabled:text-slate-400"
+                    aria-label="確認返回"
+                    disabled={actionDisabled}
+                    onClick={() => void handleAction("return")}
+                  >
+                    {acting ? "處理中…" : "確認返回"}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="min-h-16 flex-1 rounded-xl bg-amber-600 text-xl font-bold text-white active:bg-amber-700 disabled:bg-slate-300"
+                  aria-label="正式簽退"
+                  disabled={actionDisabled}
+                  onClick={() => void handleAction("final")}
+                >
+                  {acting ? "處理中…" : "正式簽退"}
+                </button>
+              </div>
+            ) : selected.length > 0 ? (
+              <p className="text-center text-base text-amber-700" role="status">
+                請分開處理「在場」與「臨時外出」的訪客
+              </p>
+            ) : null}
           </div>
         </>
       )}

@@ -7,6 +7,7 @@ import {
   jsonError,
   jsonOk,
 } from "@/lib/kiosk/api-helpers";
+import { normalizePlateNo } from "@/lib/kiosk/plate";
 import { looksLikePhone, normalizePhoneDigits } from "@/lib/kiosk/phone";
 import { createCheckinToken } from "@/lib/kiosk/session";
 import { displayVisitorName } from "@/lib/kiosk/visitor-fields";
@@ -109,6 +110,7 @@ export const POST = async (request: Request) => {
           ),
           phoneNo: String(info?.phoneNo || phoneNo || "").trim(),
           companyName: String(info?.companyName ?? "").trim(),
+          plateNo: normalizePlateNo(info?.plateNo),
           visitReason: visitReasonLabel(
             item.visitReasonType,
             item.visitReasonDetail,

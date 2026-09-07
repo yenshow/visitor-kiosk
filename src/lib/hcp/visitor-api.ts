@@ -1,5 +1,5 @@
 import { artemisPostSecure } from "./artemis-client";
-import { normalizeRegisterNames } from "@/lib/kiosk/visitor-fields";
+import { toHcpVisitorNames } from "@/lib/kiosk/visitor-fields";
 
 export type HcpApiResult<T> = {
   code: string;
@@ -16,6 +16,8 @@ export type VisitorInfo = {
   phoneNo?: string;
   companyName?: string;
   email?: string;
+  /** 車牌；部分 HCP 版本欄位名可能不同 */
+  plateNo?: string;
 };
 
 export type AppointmentItem = {
@@ -82,22 +84,31 @@ const assertSuccess = <T>(result: HcpApiResult<T>, fallbackMsg: string): T => {
   return result.data;
 };
 
+const optionalTrim = (value?: string): string | undefined => {
+  const text = String(value ?? "").trim();
+  return text || undefined;
+};
+
 export const createAppointment = async (body: {
   receptionistId: string;
   appointStartTime: string;
   appointEndTime: string;
   visitReasonType: number;
   visitReasonDetail?: string;
-  visitorInfo: {
-    visitorFamilyName: string;
-    visitorGivenName: string;
-    companyName?: string;
-    phoneNo?: string;
-    email?: string;
-    gender?: number;
-  };
+  visitorInfo: Pick<
+    VisitorInfo,
+    | "visitorFamilyName"
+    | "visitorGivenName"
+    | "companyName"
+    | "phoneNo"
+    | "email"
+    | "gender"
+    | "plateNo"
+  >;
 }): Promise<AppointResult> => {
   const path = "/artemis/api/visitor/v2/appointment";
+  const info = body.visitorInfo;
+  const plateNo = optionalTrim(info.plateNo);
   const { data } = await artemisPostSecure<HcpApiResult<AppointResult>>(path, {
     receptionistId: body.receptionistId,
     appointStartTime: body.appointStartTime,
@@ -107,12 +118,12 @@ export const createAppointment = async (body: {
     visitorInfoList: [
       {
         VisitorInfo: {
-          visitorFamilyName: body.visitorInfo.visitorFamilyName,
-          visitorGivenName: body.visitorInfo.visitorGivenName,
-          gender: body.visitorInfo.gender ?? 0,
-          companyName: body.visitorInfo.companyName ?? "",
-          phoneNo: body.visitorInfo.phoneNo ?? "",
-          email: body.visitorInfo.email ?? "",
+          ...toHcpVisitorNames(info),
+          gender: info.gender ?? 0,
+          companyName: info.companyName ?? "",
+          phoneNo: info.phoneNo ?? "",
+          email: info.email ?? "",
+          ...(plateNo ? { plateNo } : {}),
         },
       },
     ],
@@ -214,9 +225,7 @@ export const visitorCheckOut = async (
   assertSuccess(data, "簽退失敗");
 };
 
-/**
- * 報到：補齊 HCP 必填姓／名（無名用 "-"；只填姓時可能值在 given）。
- */
+/** 報到：寫入 YSCP 時空的姓／名補 "-"。 */
 export const registerCheckIn = async (body: {
   appointId: string;
   visitorId: string;
@@ -227,8 +236,7 @@ export const registerCheckIn = async (body: {
 }): Promise<RegisterResult> => {
   const path = "/artemis/api/visitor/v1/registerment";
   const info = body.visitorInfo ?? {};
-  const names = normalizeRegisterNames(info);
-  const phoneNo = String(info.phoneNo ?? "").trim();
+  const phoneNo = optionalTrim(info.phoneNo);
 
   const { data } = await artemisPostSecure<HcpApiResult<RegisterResult>>(path, {
     appointId: body.appointId,
@@ -240,7 +248,7 @@ export const registerCheckIn = async (body: {
       {
         VisitorInfo: {
           visitorId: body.visitorId,
-          ...names,
+          ...toHcpVisitorNames(info),
           gender: info.gender ?? 0,
           ...(phoneNo ? { phoneNo } : {}),
         },

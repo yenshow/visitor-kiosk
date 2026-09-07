@@ -15,6 +15,7 @@ type AppointmentView = {
   visitorName: string;
   phoneNo?: string;
   companyName: string;
+  plateNo?: string;
   visitReason?: string;
 };
 
@@ -187,6 +188,11 @@ export const CheckinFlow = ({
                     <div className="mt-1 text-base text-slate-600">
                       電話：{item.phoneNo || "—"}
                     </div>
+                    {item.plateNo ? (
+                      <div className="mt-1 text-base text-slate-600">
+                        車牌：{item.plateNo}
+                      </div>
+                    ) : null}
                     <div className="mt-1 text-base text-slate-600">
                       事由：{item.visitReason || "—"}
                     </div>
@@ -268,6 +274,12 @@ export const CheckinFlow = ({
               <p>
                 <span className="text-slate-500">公司：</span>
                 {selected.companyName}
+              </p>
+            ) : null}
+            {selected.plateNo ? (
+              <p>
+                <span className="text-slate-500">車牌：</span>
+                {selected.plateNo}
               </p>
             ) : null}
             {selected.visitReason ? (

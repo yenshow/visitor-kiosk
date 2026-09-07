@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 export type HostPerson = {
   personId: string;
@@ -170,7 +177,7 @@ export const HostPicker = ({
         const list = json.data?.orgs ?? [];
         setOrgs(list);
         if (list.length === 0) {
-          onErrorRef.current("查無部門資料，請確認 YSOP 組織設定");
+          onErrorRef.current("查無部門資料，請確認 YSCP 組織設定");
         }
       } catch {
         if (!cancelled) onErrorRef.current("載入部門失敗");
@@ -289,14 +296,14 @@ export const HostPicker = ({
           : "請選擇被訪人";
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
+    <div className="grid gap-3 sm:grid-cols-2">
       <div className="relative block" ref={orgMenuRef}>
         <span className="mb-1 block text-sm font-medium text-slate-600">
-          部門／子部門
+          部門／子部門 *
         </span>
         <button
           type="button"
-          className="flex min-h-16 w-full items-center justify-between rounded-xl border border-slate-300 bg-white px-4 text-left text-lg active:bg-slate-50 disabled:bg-slate-100"
+          className="flex min-h-14 w-full items-center justify-between rounded-xl border border-slate-300 bg-white px-4 text-left text-lg active:bg-slate-50 disabled:bg-slate-100"
           aria-label="選擇部門或子部門"
           aria-haspopup="listbox"
           aria-expanded={orgMenuOpen}
@@ -309,7 +316,9 @@ export const HostPicker = ({
         >
           <span
             className={
-              selectedOrg ? "truncate text-slate-900" : "truncate text-slate-400"
+              selectedOrg
+                ? "truncate text-slate-900"
+                : "truncate text-slate-400"
             }
           >
             {orgLabel}
@@ -344,11 +353,11 @@ export const HostPicker = ({
 
       <div className="relative block" ref={hostMenuRef}>
         <span className="mb-1 block text-sm font-medium text-slate-600">
-          被訪人
+          被訪人 *
         </span>
         <button
           type="button"
-          className="flex min-h-16 w-full items-center justify-between rounded-xl border border-slate-300 bg-white px-4 text-left text-lg active:bg-slate-50 disabled:bg-slate-100"
+          className="flex min-h-14 w-full items-center justify-between rounded-xl border border-slate-300 bg-white px-4 text-left text-lg active:bg-slate-50 disabled:bg-slate-100"
           aria-label="選擇被訪人"
           aria-haspopup="listbox"
           aria-expanded={hostMenuOpen}
@@ -361,7 +370,9 @@ export const HostPicker = ({
         >
           <span
             className={
-              selectedHost ? "truncate text-slate-900" : "truncate text-slate-400"
+              selectedHost
+                ? "truncate text-slate-900"
+                : "truncate text-slate-400"
             }
           >
             {hostLabel}

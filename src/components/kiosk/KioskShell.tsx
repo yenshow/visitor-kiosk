@@ -11,8 +11,11 @@ type KioskShellProps = {
 
 const DEFAULT_MARQUEE = "歡迎使用訪客服務機｜請選擇訪客報到、簽退或現場預約";
 
-const SHELL_MAIN =
-  "mx-auto flex min-h-0 w-3/4 flex-1 flex-col landscape:max-w-7xl";
+const SHELL_MAIN_HOME =
+  "mx-auto flex min-h-0 w-3/4 flex-1 flex-col pt-8 landscape:max-w-7xl landscape:pt-12";
+
+const SHELL_MAIN_FLOW =
+  "mx-auto flex min-h-0 w-3/4 flex-1 flex-col py-3 landscape:max-w-7xl landscape:py-4";
 
 const MarqueeBanner = ({ text }: { text: string }) => (
   <div
@@ -42,7 +45,7 @@ export const KioskShell = ({
   const isHome = layout === "home";
 
   return (
-    <div className="flex min-h-dvh flex-col">
+    <div className="flex h-dvh max-h-dvh flex-col overflow-hidden">
       {isHome ? (
         <MarqueeBanner
           text={
@@ -51,19 +54,13 @@ export const KioskShell = ({
         />
       ) : null}
 
-      <div
-        className={
-          isHome
-            ? `${SHELL_MAIN} pt-8 landscape:pt-16`
-            : `${SHELL_MAIN} py-8`
-        }
-      >
+      <div className={isHome ? SHELL_MAIN_HOME : SHELL_MAIN_FLOW}>
         {!hasCredentials ? (
           <div
             className="rounded-2xl border border-red-300/70 bg-red-950/40 px-4 py-3 text-center text-base text-red-100"
             role="alert"
           >
-            尚未設定連線金鑰，無法連線 YSOP。請在 `.env` 填入 OpenAPI
+            尚未設定連線金鑰，無法連線 YSCP。請在 `.env` 填入 OpenAPI
             金鑰後重啟服務。
           </div>
         ) : null}

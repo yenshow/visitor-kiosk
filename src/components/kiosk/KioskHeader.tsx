@@ -21,7 +21,7 @@ export const KioskHeader = () => {
     epochSeconds > 0 ? formatClockDisplay(new Date(epochSeconds * 1000)) : null;
 
   return (
-    <header className="flex shrink-0 flex-col items-center gap-6 landscape:flex-row landscape:justify-around">
+    <header className="mb-4 flex shrink-0 flex-col items-center gap-4 landscape:flex-row landscape:justify-around landscape:gap-6">
       <img
         src="/yenshow-logo.svg"
         alt="遠岫科技"
@@ -29,7 +29,7 @@ export const KioskHeader = () => {
         height={80}
         className="h-20 w-auto object-contain landscape:h-28"
       />
-      <div className="flex flex-col items-center landscape:items-end">
+      <div className="flex flex-col items-center">
         <div className="ms-3 text-[32px] font-semibold tracking-[8px] landscape:text-[44px] landscape:tracking-[12px]">
           {clock?.date ?? "--"}
         </div>

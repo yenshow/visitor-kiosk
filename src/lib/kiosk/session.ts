@@ -6,8 +6,13 @@ type SessionEntry = {
   expiresAt: number;
 };
 
-type CheckoutSessionEntry = {
+export type CheckoutSessionPayload = {
   appointRecordId: string;
+  visitorName: string;
+  plateNo: string;
+};
+
+type CheckoutSessionEntry = CheckoutSessionPayload & {
   expiresAt: number;
 };
 
@@ -64,25 +69,38 @@ export const peekCheckinToken = (token: string): AppointmentItem | null => {
   return store.get(token)?.item ?? null;
 };
 
-export const createCheckoutToken = (appointRecordId: string): string => {
+export const createCheckoutToken = (
+  payload: CheckoutSessionPayload,
+): string => {
   const store = getCheckoutStore();
   prune(store);
   const token = newToken();
-  store.set(token, { appointRecordId, expiresAt: Date.now() + TTL_MS });
+  store.set(token, { ...payload, expiresAt: Date.now() + TTL_MS });
   return token;
 };
 
-export const consumeCheckoutToken = (token: string): string | null => {
+export const consumeCheckoutToken = (
+  token: string,
+): CheckoutSessionPayload | null => {
   const store = getCheckoutStore();
   prune(store);
   const entry = store.get(token);
   if (!entry) return null;
   store.delete(token);
-  return entry.appointRecordId;
+  const { appointRecordId, visitorName, plateNo } = entry;
+  return { appointRecordId, visitorName, plateNo };
 };
 
-export const peekCheckoutToken = (token: string): string | null => {
+export const peekCheckoutToken = (
+  token: string,
+): CheckoutSessionPayload | null => {
   const store = getCheckoutStore();
   prune(store);
-  return store.get(token)?.appointRecordId ?? null;
+  const entry = store.get(token);
+  if (!entry) return null;
+  return {
+    appointRecordId: entry.appointRecordId,
+    visitorName: entry.visitorName,
+    plateNo: entry.plateNo,
+  };
 };

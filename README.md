@@ -1,6 +1,6 @@
-# 訪客服務機（Visitor Kiosk）
+# 訪客服務機（YSOP / Visitor Kiosk）
 
-獨立的訪客**預約**與**報到** Web 平台，透過後端代理對接 HikCentral Professional（HCP）Artemis OpenAPI。
+獨立的訪客**預約**、**報到**與**簽退** Web 平台，透過後端代理對接 HikCentral Professional（**YSCP = HCP**）Artemis OpenAPI。
 
 ## 環境設定
 
@@ -34,10 +34,13 @@ npm run dev
 
 ## API（前端勿直打 Artemis）
 
-- `GET /api/kiosk/status`：HCP 連線設定狀態
+- `GET /api/kiosk/status`：YSCP 連線設定狀態
+- `GET /api/kiosk/stats`：在場／臨時外出／今日離場
 - `GET /api/kiosk/notice`
 - `GET /api/kiosk/orgs`：部門清單
 - `POST /api/kiosk/hosts`：依部門載入被訪人
-- `POST /api/kiosk/appoint`：建立預約（無需須知）
+- `POST /api/kiosk/appoint`：建立預約（可含車牌，無需須知）
 - `POST /api/kiosk/verify`：預約密碼查詢
 - `POST /api/kiosk/checkin`：報到（需同意訪客須知）
+- `POST /api/kiosk/checkout/lookup`：簽退／臨時外出查詢
+- `POST /api/kiosk/checkout`：`mode=temp|return|final`
