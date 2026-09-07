@@ -1,0 +1,6 @@
+# 訪客須知影片放置說明
+#
+# 方式一：把檔案命名為 notice.mp4 放在 public/
+# 方式二：放到子資料夾，例如 public/videos/notice.mp4
+#         並設定 NEXT_PUBLIC_NOTICE_VIDEO_URL=/videos/
+# 方式三：填完整網址，例如 https://cdn.example.com/safety.mp4

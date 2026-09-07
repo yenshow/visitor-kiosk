@@ -1,0 +1,34 @@
+@import "tailwindcss";
+
+@theme {
+  --animate-marquee: marquee-scroll 30s linear infinite;
+}
+
+html,
+body {
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+  touch-action: manipulation;
+}
+
+button,
+[role="button"],
+[role="option"],
+[role="radio"],
+[role="checkbox"] {
+  user-select: none;
+}
+
+@keyframes marquee-scroll {
+  to {
+    transform: translate3d(-33.333%, 0, 0);
+  }
+}
