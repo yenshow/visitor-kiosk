@@ -4,7 +4,6 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { resolveNoticeVideoSource } from "@/lib/kiosk/notice-video";
 
 type VisitorNoticeDialogProps = {
-  open: boolean;
   title?: string;
   confirmLabel: string;
   loading?: boolean;
@@ -12,8 +11,9 @@ type VisitorNoticeDialogProps = {
   onConfirm: () => void;
 };
 
+const SCROLL_BOTTOM_THRESHOLD_PX = 24;
+
 export const VisitorNoticeDialog = ({
-  open,
   title = "訪客須知",
   confirmLabel,
   loading = false,
@@ -22,9 +22,11 @@ export const VisitorNoticeDialog = ({
 }: VisitorNoticeDialogProps) => {
   const titleId = useId();
   const videoRef = useRef<HTMLVideoElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const [content, setContent] = useState("");
   const [accepted, setAccepted] = useState(false);
-  const [fetching, setFetching] = useState(false);
+  const [reachedBottom, setReachedBottom] = useState(false);
+  const [fetching, setFetching] = useState(true);
   const [videoAvailable, setVideoAvailable] = useState(true);
 
   const videoSource = useMemo(
@@ -32,21 +34,18 @@ export const VisitorNoticeDialog = ({
     [],
   );
 
-  useEffect(() => {
-    if (!open) {
-      setAccepted(false);
-      setVideoAvailable(true);
-      const video = videoRef.current;
-      if (video) {
-        video.pause();
-        video.currentTime = 0;
-      }
-      return;
+  const updateReachedBottom = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const remaining = el.scrollHeight - el.scrollTop - el.clientHeight;
+    if (remaining <= SCROLL_BOTTOM_THRESHOLD_PX) {
+      setReachedBottom(true);
     }
+  };
 
+  useEffect(() => {
     let cancelled = false;
     const load = async () => {
-      setFetching(true);
       try {
         const res = await fetch("/api/kiosk/notice");
         const json = (await res.json()) as {
@@ -65,18 +64,27 @@ export const VisitorNoticeDialog = ({
     return () => {
       cancelled = true;
     };
-  }, [open]);
+  }, []);
 
   useEffect(() => {
-    if (!open || !videoAvailable || videoSource.kind !== "file") return;
+    if (fetching) return;
+    // 內容載入後若無需捲動，視為已讀完
+    const frame = window.requestAnimationFrame(() => {
+      updateReachedBottom();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [fetching, content, videoAvailable]);
+
+  useEffect(() => {
+    if (!videoAvailable || videoSource.kind !== "file") return;
     const video = videoRef.current;
     if (!video) return;
     void video.play().catch(() => {
       /* 觸控裝置可手動播放 */
     });
-  }, [open, videoAvailable, videoSource]);
+  }, [videoAvailable, videoSource]);
 
-  if (!open) return null;
+  const canAccept = reachedBottom && !fetching;
 
   return (
     <div
@@ -95,7 +103,11 @@ export const VisitorNoticeDialog = ({
           </h2>
         </div>
 
-        <div className="flex-1 space-y-4 overflow-y-auto px-6 py-4">
+        <div
+          ref={scrollRef}
+          className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-4"
+          onScroll={updateReachedBottom}
+        >
           {videoAvailable ? (
             <div className="overflow-hidden rounded-xl bg-slate-900">
               {videoSource.kind === "youtube" ? (
@@ -152,13 +164,20 @@ export const VisitorNoticeDialog = ({
             type="button"
             role="checkbox"
             aria-checked={accepted}
+            aria-disabled={!canAccept}
             aria-label="我已閱讀並同意訪客須知"
-            className={`flex min-h-16 w-full items-center gap-4 rounded-xl border px-4 text-left text-lg font-medium active:scale-[0.99] ${
-              accepted
-                ? "border-blue-600 bg-blue-50 text-blue-900"
-                : "border-slate-300 bg-white text-slate-800"
+            disabled={!canAccept}
+            className={`flex min-h-16 w-full items-center gap-4 rounded-xl border px-4 text-left text-lg font-medium ${
+              !canAccept
+                ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
+                : accepted
+                  ? "border-blue-600 bg-blue-50 text-blue-900 active:scale-[0.99]"
+                  : "border-slate-300 bg-white text-slate-800 active:scale-[0.99]"
             }`}
-            onClick={() => setAccepted((prev) => !prev)}
+            onClick={() => {
+              if (!canAccept) return;
+              setAccepted((prev) => !prev);
+            }}
           >
             <span
               className={`flex size-8 shrink-0 items-center justify-center rounded-md border-2 text-base ${

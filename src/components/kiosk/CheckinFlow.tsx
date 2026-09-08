@@ -1,11 +1,16 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { FlowCard } from "@/components/kiosk/FlowCard";
-import { IdleCountdown } from "@/components/kiosk/IdleCountdown";
-import { NumericKeypad } from "@/components/kiosk/NumericKeypad";
+import { FlowCard, FlowResult } from "@/components/kiosk/FlowCard";
+import { CodeQueryForm } from "@/components/kiosk/NumericKeypad";
 import { VisitorNoticeDialog } from "@/components/kiosk/VisitorNoticeDialog";
+import { VisitorSelectList } from "@/components/kiosk/VisitorSelectCard";
 import { formatDateTimeRange } from "@/lib/kiosk/format";
+import {
+  postCheckoutModes,
+  toggleSelectedToken,
+  type OnSiteRecordView,
+} from "@/lib/kiosk/visitor-query";
 
 type AppointmentView = {
   token: string;
@@ -22,8 +27,10 @@ type AppointmentView = {
 type CheckinFlowProps = {
   idleSeconds: number;
   onHome: () => void;
-  onGoAppoint: () => void;
+  onGoAppoint?: () => void;
 };
+
+type DoneMode = "checkin" | "return";
 
 export const CheckinFlow = ({
   idleSeconds,
@@ -35,17 +42,33 @@ export const CheckinFlow = ({
   const [error, setError] = useState("");
   const [appointments, setAppointments] = useState<AppointmentView[]>([]);
   const [selected, setSelected] = useState<AppointmentView | null>(null);
+  const [tempOutRecords, setTempOutRecords] = useState<OnSiteRecordView[]>([]);
+  const [selectedTokens, setSelectedTokens] = useState<string[]>([]);
   const [noticeOpen, setNoticeOpen] = useState(false);
-  const [checkingIn, setCheckingIn] = useState(false);
-  const [done, setDone] = useState(false);
+  const [acting, setActing] = useState(false);
+  const [doneMode, setDoneMode] = useState<DoneMode | null>(null);
+  const [doneMessage, setDoneMessage] = useState("");
 
-  const canQuery = useMemo(() => code.trim().length > 0, [code]);
+  const selectedTempOut = useMemo(
+    () => tempOutRecords.filter((item) => selectedTokens.includes(item.token)),
+    [tempOutRecords, selectedTokens],
+  );
+
+  const handleResetQuery = () => {
+    setError("");
+    setAppointments([]);
+    setSelected(null);
+    setTempOutRecords([]);
+    setSelectedTokens([]);
+  };
 
   const handleVerify = async () => {
     setLoading(true);
     setError("");
     setAppointments([]);
     setSelected(null);
+    setTempOutRecords([]);
+    setSelectedTokens([]);
     try {
       const res = await fetch("/api/kiosk/verify", {
         method: "POST",
@@ -54,10 +77,19 @@ export const CheckinFlow = ({
       });
       const json = (await res.json()) as {
         msg?: string;
-        data?: { appointments?: AppointmentView[] };
+        data?: {
+          appointments?: AppointmentView[];
+          tempOutRecords?: OnSiteRecordView[];
+        };
       };
       if (!res.ok) {
         setError(json.msg || "查詢失敗");
+        return;
+      }
+      const returning = json.data?.tempOutRecords ?? [];
+      if (returning.length > 0) {
+        setTempOutRecords(returning);
+        setSelectedTokens(returning.length === 1 ? [returning[0].token] : []);
         return;
       }
       const list = json.data?.appointments ?? [];
@@ -70,9 +102,31 @@ export const CheckinFlow = ({
     }
   };
 
+  const handleReturn = async () => {
+    if (selectedTempOut.length === 0) {
+      setError("請選擇至少一位訪客");
+      return;
+    }
+
+    setActing(true);
+    setError("");
+    try {
+      const message = await postCheckoutModes(
+        selectedTempOut.map((item) => item.token),
+        "return",
+      );
+      setDoneMessage(message || "已確認返回，狀態恢復為在場。");
+      setDoneMode("return");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "操作失敗");
+    } finally {
+      setActing(false);
+    }
+  };
+
   const handleCheckin = async () => {
     if (!selected) return;
-    setCheckingIn(true);
+    setActing(true);
     setError("");
     try {
       const res = await fetch("/api/kiosk/checkin", {
@@ -90,60 +144,41 @@ export const CheckinFlow = ({
         return;
       }
       setNoticeOpen(false);
-      setDone(true);
+      setDoneMode("checkin");
     } catch {
       setError("報到失敗");
       setNoticeOpen(false);
     } finally {
-      setCheckingIn(false);
+      setActing(false);
     }
   };
 
-  if (done) {
+  if (doneMode) {
     return (
-      <div className="mx-auto flex w-full max-w-2xl flex-col items-center rounded-3xl bg-white p-10 shadow-xl">
-        <h2 className="text-3xl font-bold text-emerald-700">報到成功</h2>
-        <p className="mt-6 text-center text-xl leading-8 text-slate-700">
-          請稍候，內部人員將前來帶領您入內。
-        </p>
-        <p className="mt-2 text-center text-base text-slate-500">
-          感謝您的耐心等候
-        </p>
-        <button
-          type="button"
-          className="mt-8 min-h-16 rounded-xl bg-slate-800 px-8 text-xl font-semibold text-white active:bg-slate-700"
-          aria-label="返回首頁"
-          onClick={onHome}
-        >
-          返回首頁
-        </button>
-        <IdleCountdown seconds={idleSeconds} onComplete={onHome} />
-      </div>
+      <FlowResult title={doneMode === "return" ? "已確認返回" : "報到成功"} idleSeconds={idleSeconds} onHome={onHome}>
+        {doneMode === "return" ? (
+          <p className="text-lg text-slate-600">{doneMessage}</p>
+        ) : (
+          <>
+            <p className="text-xl leading-8">請稍候，內部人員將前來帶領您入內。</p>
+            <p className="mt-2 text-base text-slate-500">感謝您的耐心等候</p>
+          </>
+        )}
+      </FlowResult>
     );
   }
 
-  if (error && appointments.length === 0 && !selected) {
+  if (error && appointments.length === 0 && !selected && tempOutRecords.length === 0) {
     const isNotFound = error.includes("查無");
     return (
-      <div className="mx-auto flex w-full max-w-2xl flex-col items-center rounded-3xl bg-white p-10 shadow-xl">
-        <h2 className="text-3xl font-bold text-slate-900">無法報到</h2>
-        <p className="mt-4 text-center text-xl text-slate-700" role="alert">
-          {error}
-        </p>
-        <div className="mt-8 flex flex-wrap justify-center gap-3">
-          <button
-            type="button"
-            className="min-h-16 rounded-xl border border-slate-300 px-6 text-lg font-semibold text-slate-700 active:bg-slate-50"
-            aria-label="再試一次"
-            onClick={() => {
-              setError("");
-              setAppointments([]);
-              setSelected(null);
-            }}
-          >
-            再試一次
-          </button>
-          {isNotFound ? (
+      <FlowResult
+        title="無法報到"
+        tone="error"
+        idleSeconds={idleSeconds}
+        onHome={onHome}
+        onRetry={handleResetQuery}
+        extraActions={
+          isNotFound && onGoAppoint ? (
             <button
               type="button"
               className="min-h-16 rounded-xl bg-blue-600 px-6 text-lg font-semibold text-white active:bg-blue-700"
@@ -152,18 +187,60 @@ export const CheckinFlow = ({
             >
               訪客預約
             </button>
-          ) : null}
+          ) : null
+        }
+      >
+        <p className="text-xl" role="alert">
+          {error}
+        </p>
+      </FlowResult>
+    );
+  }
+
+  if (tempOutRecords.length > 0) {
+    return (
+      <FlowCard title="訪客報到" onBack={onHome}>
+        <p className="mb-3 text-lg text-slate-600">
+          {tempOutRecords.length > 1
+            ? "找到多位臨時外出訪客（共乘請勾選要返回的人）"
+            : "您目前為臨時外出，請確認資料後返回"}
+        </p>
+
+        <VisitorSelectList
+          items={tempOutRecords}
+          selectedTokens={selectedTokens}
+          onToggle={(token) =>
+            setSelectedTokens((prev) => toggleSelectedToken(prev, token))
+          }
+        />
+
+        {error ? (
+          <p className="mt-4 text-lg text-red-600" role="alert">
+            {error}
+          </p>
+        ) : null}
+
+        <div className="mt-6 flex flex-col gap-3">
           <button
             type="button"
-            className="min-h-16 rounded-xl border border-slate-300 px-6 text-lg font-semibold text-slate-700 active:bg-slate-50"
-            aria-label="返回首頁"
-            onClick={onHome}
+            className="min-h-14 w-full rounded-xl border border-slate-300 text-lg font-semibold text-slate-700 active:bg-slate-50 disabled:opacity-50"
+            aria-label="重新查詢"
+            disabled={acting}
+            onClick={handleResetQuery}
           >
-            返回首頁
+            重新查詢
+          </button>
+          <button
+            type="button"
+            className="min-h-16 w-full rounded-xl border-2 border-emerald-600 bg-white text-xl font-bold text-emerald-700 active:bg-emerald-50 disabled:bg-slate-100 disabled:text-slate-400"
+            aria-label="確認返回"
+            disabled={acting || selectedTempOut.length === 0}
+            onClick={() => void handleReturn()}
+          >
+            {acting ? "處理中…" : "確認返回"}
           </button>
         </div>
-        <IdleCountdown seconds={idleSeconds} onComplete={onHome} />
-      </div>
+      </FlowCard>
     );
   }
 
@@ -213,49 +290,21 @@ export const CheckinFlow = ({
               type="button"
               className="mt-6 min-h-14 w-full rounded-xl border border-slate-300 text-lg font-semibold text-slate-700 active:bg-slate-50"
               aria-label="重新輸入"
-              onClick={() => {
-                setAppointments([]);
-                setError("");
-              }}
+              onClick={handleResetQuery}
             >
               重新輸入
             </button>
           </>
         ) : (
-          <>
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium text-slate-600">
-                預約密碼或手機號碼
-              </span>
-              <input
-                className="min-h-16 w-full rounded-xl border border-slate-300 px-4 text-center text-3xl tracking-[0.35em] text-slate-900 placeholder:text-slate-400"
-                value={code}
-                readOnly
-                inputMode="none"
-                placeholder="請用下方鍵盤輸入"
-                aria-label="預約密碼或手機號碼"
-              />
-            </label>
-
-            <NumericKeypad
-              disabled={loading}
-              onDigit={(digit) =>
-                setCode((prev) => `${prev}${digit}`.slice(0, 16))
-              }
-              onBackspace={() => setCode((prev) => prev.slice(0, -1))}
-              onClear={() => setCode("")}
-            />
-
-            <button
-              type="button"
-              className="mt-6 min-h-16 w-full rounded-2xl bg-blue-600 text-xl font-bold text-white active:bg-blue-700 disabled:bg-slate-300"
-              aria-label="查詢預約"
-              disabled={!canQuery || loading}
-              onClick={() => void handleVerify()}
-            >
-              {loading ? "查詢中…" : "查詢預約"}
-            </button>
-          </>
+          <CodeQueryForm
+            code={code}
+            loading={loading}
+            submitLabel="查詢預約"
+            submitClassName="bg-blue-600 active:bg-blue-700"
+            ariaLabel="查詢預約"
+            onCodeChange={setCode}
+            onSubmit={() => void handleVerify()}
+          />
         )
       ) : (
         <>
@@ -314,11 +363,7 @@ export const CheckinFlow = ({
               type="button"
               className="min-h-16 flex-1 rounded-xl border border-slate-300 text-xl font-semibold text-slate-700 active:bg-slate-50"
               aria-label="重新查詢"
-              onClick={() => {
-                setSelected(null);
-                setAppointments([]);
-                setError("");
-              }}
+              onClick={handleResetQuery}
             >
               重新查詢
             </button>
@@ -334,13 +379,14 @@ export const CheckinFlow = ({
         </>
       )}
 
-      <VisitorNoticeDialog
-        open={noticeOpen}
-        confirmLabel="同意並報到"
-        loading={checkingIn}
-        onCancel={() => setNoticeOpen(false)}
-        onConfirm={() => void handleCheckin()}
-      />
+      {noticeOpen ? (
+        <VisitorNoticeDialog
+          confirmLabel="同意並報到"
+          loading={acting}
+          onCancel={() => setNoticeOpen(false)}
+          onConfirm={() => void handleCheckin()}
+        />
+      ) : null}
     </FlowCard>
   );
 };

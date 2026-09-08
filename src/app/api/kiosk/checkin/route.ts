@@ -1,9 +1,16 @@
 import { reapplyAuth, registerCheckIn } from "@/lib/hcp/visitor-api";
 import { jsonError, jsonOk, toTaipeiIso } from "@/lib/kiosk/api-helpers";
+import { normalizePlateNo } from "@/lib/kiosk/plate";
+import {
+  lookupCachedPlate,
+  rememberPlate,
+} from "@/lib/kiosk/plate-cache";
+import { upsertVisitorMeta } from "@/lib/kiosk/presence";
 import {
   consumeCheckinToken,
   peekCheckinToken,
 } from "@/lib/kiosk/session";
+import { displayVisitorName } from "@/lib/kiosk/visitor-fields";
 
 type CheckinBody = {
   acceptedNotice?: boolean;
@@ -37,6 +44,14 @@ export const POST = async (request: Request) => {
       item.appointEndTime || visitStartTime.replace(/T.*/, "T23:59:59+08:00");
 
     const visitPurposeType = Number(item.visitReasonType ?? 0);
+    const info = item.visitorInfo;
+    const plateNo =
+      normalizePlateNo(info?.plateNo) ||
+      (await lookupCachedPlate({
+        visitorId,
+        phoneNo: info?.phoneNo,
+        appointId,
+      }));
 
     const result = await registerCheckIn({
       appointId,
@@ -46,10 +61,42 @@ export const POST = async (request: Request) => {
       visitPurposeType: Number.isFinite(visitPurposeType)
         ? visitPurposeType
         : 0,
-      visitorInfo: item.visitorInfo,
+      visitorInfo: {
+        ...info,
+        ...(plateNo ? { plateNo } : {}),
+      },
     });
 
     consumeCheckinToken(token);
+
+    const recordId = String(result.appointRecordId ?? "").trim();
+    const visitorName = displayVisitorName(
+      info?.visitorFamilyName,
+      info?.visitorGivenName,
+      info?.visitorName,
+    );
+
+    if (recordId) {
+      await upsertVisitorMeta({
+        recordId,
+        visitorId,
+        visitorName,
+        phoneNo: info?.phoneNo,
+        plateNo,
+        companyName: info?.companyName,
+        receptionistName: item.receptionistName,
+      });
+    }
+
+    if (plateNo) {
+      await rememberPlate({
+        plateNo,
+        visitorId,
+        phoneNo: info?.phoneNo,
+        appointId,
+        recordId: recordId || undefined,
+      });
+    }
 
     void reapplyAuth(visitorId).catch(() => undefined);
 

@@ -1,7 +1,77 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --animate-marquee: marquee-scroll 30s linear infinite;
+}
+
+/*
+ * 主題語意變數（對齊 ba-frontend-construction）
+ * 明亮／黑暗皆：報到＝亮色主按鈕；簽退＝玻璃次按鈕；統計卡＝輕量面板（不另加重底）
+ */
+:root {
+  --shell-gradient: linear-gradient(155deg, #13a6a9 0%, #002247 100%);
+  --text-primary: #ffffff;
+  --text-secondary: rgba(255, 255, 255, 0.85);
+  --text-muted: rgba(255, 255, 255, 0.6);
+  --surface-panel: rgba(255, 255, 255, 0.1);
+  --surface-panel-hover: rgba(255, 255, 255, 0.16);
+  --border-panel: rgba(255, 255, 255, 0.25);
+  --border-panel-strong: rgba(255, 255, 255, 0.55);
+  --focus-ring: #5be7f1;
+
+  --tile-primary-bg: linear-gradient(145deg, #2dd4bf 0%, #1ba9d3 100%);
+  --tile-primary-text: #0b2c3c;
+  --tile-primary-muted: rgba(11, 44, 60, 0.8);
+  --tile-primary-border: rgba(255, 255, 255, 0.55);
+  --tile-primary-icon-bg: rgba(255, 255, 255, 0.25);
+  --tile-primary-shadow:
+    0 12px 40px rgba(23, 217, 199, 0.28), 0 0 24px rgba(27, 169, 211, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45);
+
+  --tile-secondary-bg: rgba(255, 255, 255, 0.1);
+  --tile-secondary-text: #e8fbff;
+  --tile-secondary-muted: rgba(232, 251, 255, 0.75);
+  --tile-secondary-border: rgba(91, 231, 241, 0.55);
+  --tile-secondary-icon-bg: rgba(255, 255, 255, 0.1);
+  --tile-secondary-icon-border: rgba(91, 231, 241, 0.5);
+  --tile-secondary-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.2), 0 4px 16px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 4px rgba(0, 0, 0, 0.2);
+}
+
+html.dark {
+  --shell-gradient: linear-gradient(155deg, #004a56 0%, #000018 100%);
+  --text-primary: #e8f6f8;
+  --text-secondary: rgba(232, 246, 248, 0.78);
+  --text-muted: rgba(232, 246, 248, 0.52);
+  --surface-panel: rgba(255, 255, 255, 0.08);
+  --surface-panel-hover: rgba(255, 255, 255, 0.12);
+  --border-panel: rgba(255, 255, 255, 0.22);
+  --border-panel-strong: rgba(255, 255, 255, 0.38);
+  --focus-ring: #3dd9e8;
+
+  /* 報到：維持亮色主按鈕層級（同圖二） */
+  --tile-primary-bg: linear-gradient(145deg, #2dd4bf 0%, #1ba9d3 100%);
+  --tile-primary-text: #0b2c3c;
+  --tile-primary-muted: rgba(11, 44, 60, 0.8);
+  --tile-primary-border: rgba(255, 255, 255, 0.5);
+  --tile-primary-icon-bg: rgba(255, 255, 255, 0.25);
+  --tile-primary-shadow:
+    0 12px 40px rgba(23, 217, 199, 0.22), 0 0 20px rgba(27, 169, 211, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+
+  /* 簽退：玻璃次按鈕 */
+  --tile-secondary-bg: rgba(255, 255, 255, 0.08);
+  --tile-secondary-text: #e8f6f8;
+  --tile-secondary-muted: rgba(232, 246, 248, 0.7);
+  --tile-secondary-border: rgba(61, 217, 232, 0.55);
+  --tile-secondary-icon-bg: rgba(255, 255, 255, 0.06);
+  --tile-secondary-icon-border: rgba(61, 217, 232, 0.5);
+  --tile-secondary-shadow:
+    0 8px 28px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    inset 0 -1px 4px rgba(0, 0, 0, 0.25);
 }
 
 html,
@@ -42,4 +112,18 @@ button,
   to {
     transform: translate3d(-33.333%, 0, 0);
   }
+}
+
+.kiosk-tile-primary {
+  border-color: var(--tile-primary-border);
+  background: var(--tile-primary-bg);
+  color: var(--tile-primary-text);
+  box-shadow: var(--tile-primary-shadow);
+}
+
+.kiosk-tile-secondary {
+  border-color: var(--tile-secondary-border);
+  background: var(--tile-secondary-bg);
+  color: var(--tile-secondary-text);
+  box-shadow: var(--tile-secondary-shadow);
 }

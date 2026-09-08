@@ -61,15 +61,30 @@ export const flattenRegisterRecord = (
       fromBaseOrRoot(["fullName", "visitorName", "name"]),
     ),
     phoneNo: fromBaseOrRoot(["phoneNum", "phoneNo", "phone", "mobile"]),
-    companyName: fromBaseOrRoot(["companyName"]),
-    receptionistName: pickText(root, [
-      "receptionistName",
-      "interviewName",
-      "beVisitedPersonName",
-      "hostName",
-    ]),
+    companyName:
+      fromBaseOrRoot(["companyName"]) ||
+      fromBaseOrRoot(["visitorGroup", "visitorGroupName"]),
+    receptionistName:
+      pickText(root, [
+        "receptionistName",
+        "interviewName",
+        "beVisitedPersonName",
+        "hostName",
+      ]) ||
+      pickText(base, [
+        "receptionistName",
+        "interviewName",
+        "beVisitedPersonName",
+        "hostName",
+      ]),
     plateNo: normalizePlateNo(
-      fromBaseOrRoot(["plateNo", "plateNumber", "vehiclePlate", "carNumber"]),
+      fromBaseOrRoot([
+        "plateNo",
+        "plateNumber",
+        "vehiclePlate",
+        "carNumber",
+        "licensePlate",
+      ]),
     ),
     visitStartTime:
       pickText(base, ["visitStartTime"]) ||

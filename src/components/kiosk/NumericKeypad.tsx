@@ -58,3 +58,56 @@ export const NumericKeypad = ({
     </div>
   );
 };
+
+type CodeQueryFormProps = {
+  code: string;
+  loading: boolean;
+  submitLabel: string;
+  submitClassName: string;
+  ariaLabel: string;
+  onCodeChange: (next: string) => void;
+  onSubmit: () => void;
+};
+
+export const CodeQueryForm = ({
+  code,
+  loading,
+  submitLabel,
+  submitClassName,
+  ariaLabel,
+  onCodeChange,
+  onSubmit,
+}: CodeQueryFormProps) => (
+  <>
+    <label className="block">
+      <span className="mb-2 block text-sm font-medium text-slate-600">
+        預約密碼或手機號碼
+      </span>
+      <input
+        className="min-h-16 w-full rounded-xl border border-slate-300 px-4 text-center text-3xl tracking-[0.35em] text-slate-900 placeholder:text-slate-400"
+        value={code}
+        readOnly
+        inputMode="none"
+        placeholder="請用下方鍵盤輸入"
+        aria-label="預約密碼或手機號碼"
+      />
+    </label>
+
+    <NumericKeypad
+      disabled={loading}
+      onDigit={(digit) => onCodeChange(`${code}${digit}`.slice(0, 16))}
+      onBackspace={() => onCodeChange(code.slice(0, -1))}
+      onClear={() => onCodeChange("")}
+    />
+
+    <button
+      type="button"
+      className={`mt-6 min-h-16 w-full rounded-2xl text-xl font-bold text-white disabled:bg-slate-300 ${submitClassName}`}
+      aria-label={ariaLabel}
+      disabled={code.trim().length === 0 || loading}
+      onClick={onSubmit}
+    >
+      {loading ? "查詢中…" : submitLabel}
+    </button>
+  </>
+);

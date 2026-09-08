@@ -54,3 +54,18 @@ export const formatDateTimeRange = (
 
   return `${formatOne(startIso)} ～ ${formatOne(endIso)}`;
 };
+
+/** 單一 ISO 時間顯示 */
+export const formatDateTime = (iso: string): string => {
+  if (!iso) return "—";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return date.toLocaleString("zh-TW", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+};

@@ -237,6 +237,8 @@ export const registerCheckIn = async (body: {
   const path = "/artemis/api/visitor/v1/registerment";
   const info = body.visitorInfo ?? {};
   const phoneNo = optionalTrim(info.phoneNo);
+  const plateNo = optionalTrim(info.plateNo);
+  const companyName = optionalTrim(info.companyName);
 
   const { data } = await artemisPostSecure<HcpApiResult<RegisterResult>>(path, {
     appointId: body.appointId,
@@ -251,6 +253,8 @@ export const registerCheckIn = async (body: {
           ...toHcpVisitorNames(info),
           gender: info.gender ?? 0,
           ...(phoneNo ? { phoneNo } : {}),
+          ...(plateNo ? { plateNo } : {}),
+          ...(companyName ? { companyName } : {}),
         },
       },
     ],

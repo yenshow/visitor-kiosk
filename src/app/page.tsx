@@ -10,6 +10,13 @@ import {
   type KioskStatsView,
 } from "@/components/kiosk/HomeActionCards";
 import { KioskShell } from "@/components/kiosk/KioskShell";
+import { RecordsDialog } from "@/components/kiosk/RecordsDialog";
+import type { KioskSettingsView } from "@/components/kiosk/SettingsForm";
+import { ThemeSync } from "@/components/kiosk/ThemeSync";
+import {
+  DEFAULT_MARQUEE,
+  type RecordsFilter,
+} from "@/lib/kiosk/ui-constants";
 
 type Screen = "home" | "appoint" | "checkin" | "checkout";
 
@@ -34,9 +41,7 @@ const FlowPanel = ({
 }) => (
   <div className="min-h-0 w-full flex-1 overflow-y-auto">
     <div className="flex min-h-full flex-col justify-center">
-      <div
-        className={`mx-auto w-full ${wide ? "max-w-3xl" : "max-w-2xl"}`}
-      >
+      <div className={`mx-auto w-full ${wide ? "max-w-3xl" : "max-w-2xl"}`}>
         {children}
       </div>
     </div>
@@ -47,14 +52,25 @@ export default function HomePage() {
   const [screen, setScreen] = useState<Screen>("home");
   const [status, setStatus] = useState<StatusInfo | null>(null);
   const [stats, setStats] = useState<KioskStatsView | null>(null);
+  const [settings, setSettings] = useState<KioskSettingsView | null>(null);
+  const [recordsOpen, setRecordsOpen] = useState(false);
+  const [recordsFilter, setRecordsFilter] = useState<RecordsFilter>("all");
 
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
       try {
-        const res = await fetch("/api/kiosk/status");
-        const json = (await res.json()) as { data?: StatusInfo };
-        if (!cancelled && json.data) setStatus(json.data);
+        const [statusRes, settingsRes] = await Promise.all([
+          fetch("/api/kiosk/status"),
+          fetch("/api/kiosk/settings"),
+        ]);
+        const statusJson = (await statusRes.json()) as { data?: StatusInfo };
+        const settingsJson = (await settingsRes.json()) as {
+          data?: KioskSettingsView;
+        };
+        if (cancelled) return;
+        if (statusJson.data) setStatus(statusJson.data);
+        if (settingsJson.data) setSettings(settingsJson.data);
       } catch {
         // ignore
       }
@@ -90,46 +106,70 @@ export default function HomePage() {
     };
   }, [screen]);
 
-  const handleGoHome = () => setScreen("home");
-  const handleOpenCheckin = () => setScreen("checkin");
-  const handleOpenCheckout = () => setScreen("checkout");
-  const handleOpenAppoint = () => setScreen("appoint");
+  const showAppoint = settings?.showAppoint ?? true;
 
   return (
-    <KioskShell
-      hasCredentials={status?.hasCredentials ?? true}
-      layout={screen === "home" ? "home" : "flow"}
-    >
-      {screen === "home" ? (
-        <HomeActionCards
-          stats={stats}
-          onCheckin={handleOpenCheckin}
-          onCheckout={handleOpenCheckout}
-          onAppoint={handleOpenAppoint}
+    <>
+      <ThemeSync theme={settings?.theme} />
+      <KioskShell
+        hasCredentials={status?.hasCredentials ?? true}
+        layout={screen === "home" ? "home" : "flow"}
+        marquee={settings?.resolvedMarquee || DEFAULT_MARQUEE}
+        logoUrl={settings?.logoUrl || "/yenshow-logo.svg"}
+      >
+        {screen === "home" ? (
+          <HomeActionCards
+            stats={stats}
+            showAppoint={showAppoint}
+            onCheckin={() => setScreen("checkin")}
+            onCheckout={() => setScreen("checkout")}
+            onAppoint={() => setScreen("appoint")}
+            onOpenRecords={(filter) => {
+              setRecordsFilter(filter);
+              setRecordsOpen(true);
+            }}
+          />
+        ) : null}
+
+        {screen === "appoint" ? (
+          <FlowPanel wide>
+            <AppointForm
+              idleSeconds={IDLE_SECONDS}
+              onHome={() => setScreen("home")}
+            />
+          </FlowPanel>
+        ) : null}
+
+        {screen === "checkin" ? (
+          <FlowPanel>
+            <CheckinFlow
+              idleSeconds={IDLE_SECONDS}
+              onHome={() => setScreen("home")}
+              onGoAppoint={
+                showAppoint ? () => setScreen("appoint") : undefined
+              }
+            />
+          </FlowPanel>
+        ) : null}
+
+        {screen === "checkout" ? (
+          <FlowPanel>
+            <CheckoutFlow
+              idleSeconds={IDLE_SECONDS}
+              onHome={() => setScreen("home")}
+            />
+          </FlowPanel>
+        ) : null}
+      </KioskShell>
+
+      {recordsOpen ? (
+        <RecordsDialog
+          key={recordsFilter}
+          open
+          initialFilter={recordsFilter}
+          onClose={() => setRecordsOpen(false)}
         />
       ) : null}
-
-      {screen === "appoint" ? (
-        <FlowPanel wide>
-          <AppointForm idleSeconds={IDLE_SECONDS} onHome={handleGoHome} />
-        </FlowPanel>
-      ) : null}
-
-      {screen === "checkin" ? (
-        <FlowPanel>
-          <CheckinFlow
-            idleSeconds={IDLE_SECONDS}
-            onHome={handleGoHome}
-            onGoAppoint={handleOpenAppoint}
-          />
-        </FlowPanel>
-      ) : null}
-
-      {screen === "checkout" ? (
-        <FlowPanel>
-          <CheckoutFlow idleSeconds={IDLE_SECONDS} onHome={handleGoHome} />
-        </FlowPanel>
-      ) : null}
-    </KioskShell>
+    </>
   );
 }

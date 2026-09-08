@@ -13,9 +13,25 @@ export const toHcpVisitorNames = (info: {
   };
 };
 
+/** 隱藏 HCP 姓名佔位「-」（含組字後的 "test02 -"、"-蘇"） */
 const visibleNamePart = (value?: string): string => {
-  const text = String(value ?? "").trim();
-  return text === HCP_EMPTY_NAME ? "" : text;
+  let text = String(value ?? "").trim();
+  if (!text || text === HCP_EMPTY_NAME) return "";
+
+  // 前綴佔位（例如 "-蘇"）
+  if (text.startsWith(HCP_EMPTY_NAME)) {
+    text = text.slice(HCP_EMPTY_NAME.length).trim();
+  }
+  if (!text || text === HCP_EMPTY_NAME) return "";
+
+  // 空白分隔的佔位 token（例如 "test02 -"、"- 蘇"）
+  text = text
+    .split(/\s+/)
+    .filter((part) => part !== HCP_EMPTY_NAME)
+    .join(" ")
+    .trim();
+
+  return !text || text === HCP_EMPTY_NAME ? "" : text;
 };
 
 export const displayVisitorName = (

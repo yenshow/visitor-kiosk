@@ -40,7 +40,7 @@ npm run dev
 - `GET /api/kiosk/orgs`：部門清單
 - `POST /api/kiosk/hosts`：依部門載入被訪人
 - `POST /api/kiosk/appoint`：建立預約（可含車牌，無需須知）
-- `POST /api/kiosk/verify`：預約密碼查詢
+- `POST /api/kiosk/verify`：報到查詢（待簽到或臨時外出返回）
 - `POST /api/kiosk/checkin`：報到（需同意訪客須知）
 - `POST /api/kiosk/checkout/lookup`：簽退／臨時外出查詢
-- `POST /api/kiosk/checkout`：`mode=temp|return|final`
+- `POST /api/kiosk/checkout`：`mode=temp|return|final`（`return` 由訪客報到呼叫）

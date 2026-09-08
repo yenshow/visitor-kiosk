@@ -243,10 +243,6 @@ export const HostPicker = ({
   }, []);
 
   useEffect(() => {
-    void loadHosts(orgIndexCode);
-  }, [orgIndexCode, loadHosts]);
-
-  useEffect(() => {
     if (!orgMenuOpen && !hostMenuOpen) return;
     const handlePointerDown = (event: MouseEvent | TouchEvent) => {
       const target = event.target as Node;
@@ -269,6 +265,7 @@ export const HostPicker = ({
     setOrgIndexCode(code);
     setOrgMenuOpen(false);
     setHostMenuOpen(false);
+    void loadHosts(code);
   };
 
   const handlePickHost = (host: HostPerson) => {

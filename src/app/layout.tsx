@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Noto_Sans_TC } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 
 const notoSansTc = Noto_Sans_TC({
@@ -21,9 +22,10 @@ export default function RootLayout({
   return (
     <html lang="zh-Hant" className="h-full" suppressHydrationWarning>
       <body
-        className={`${notoSansTc.className} min-h-dvh bg-[linear-gradient(155deg,#13a6a9_0%,#002247_100%)] text-white antialiased`}
+        className={`${notoSansTc.className} min-h-dvh bg-(image:--shell-gradient) text-(--text-primary) antialiased`}
         suppressHydrationWarning
       >
+        <Script src="/theme-init.js" strategy="beforeInteractive" />
         {children}
       </body>
     </html>

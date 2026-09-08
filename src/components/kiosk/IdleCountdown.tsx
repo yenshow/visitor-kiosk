@@ -14,11 +14,16 @@ export const IdleCountdown = ({
   label = "秒後返回首頁",
 }: IdleCountdownProps) => {
   const [left, setLeft] = useState(seconds);
+  const [trackedSeconds, setTrackedSeconds] = useState(seconds);
   const completedRef = useRef(false);
+
+  if (seconds !== trackedSeconds) {
+    setTrackedSeconds(seconds);
+    setLeft(seconds);
+  }
 
   useEffect(() => {
     completedRef.current = false;
-    setLeft(seconds);
     const timer = window.setInterval(() => {
       setLeft((prev) => (prev <= 1 ? 0 : prev - 1));
     }, 1000);

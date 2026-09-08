@@ -7,17 +7,20 @@ import {
   jsonError,
   jsonOk,
 } from "@/lib/kiosk/api-helpers";
+import { lookupOnSiteRecords } from "@/lib/kiosk/on-site-lookup";
 import { normalizePlateNo } from "@/lib/kiosk/plate";
-import { looksLikePhone, normalizePhoneDigits } from "@/lib/kiosk/phone";
+import {
+  lookupCachedPlate,
+  rememberPlate,
+} from "@/lib/kiosk/plate-cache";
+import { normalizePhoneDigits } from "@/lib/kiosk/phone";
 import { createCheckinToken } from "@/lib/kiosk/session";
 import { displayVisitorName } from "@/lib/kiosk/visitor-fields";
+import {
+  parseVisitorQuery,
+  type VisitorQueryInput,
+} from "@/lib/kiosk/visitor-query";
 import { visitReasonLabel } from "@/lib/kiosk/visit-reason";
-
-type VerifyBody = {
-  query?: string;
-  appointCode?: string;
-  phoneNo?: string;
-};
 
 const isPendingCheckin = (status: unknown) => String(status ?? "0") === "0";
 
@@ -42,25 +45,18 @@ const statusMessage = (status: unknown) => {
   return "預約尚未核准或已使用，請等待內部確認或重新預約";
 };
 
+const alreadyOnSiteMessage = "您已在場，如需臨時外出或簽退請使用訪客簽退";
+
 export const POST = async (request: Request) => {
   try {
-    const body = (await request.json()) as VerifyBody;
-    const query = String(body.query ?? "").trim();
-    let appointCode = String(body.appointCode ?? "").trim();
-    let phoneNo = String(body.phoneNo ?? "").trim();
+    const body = (await request.json()) as VisitorQueryInput;
+    const { query, appointCode, phoneNo } = parseVisitorQuery(body);
 
-    if (!appointCode && !phoneNo && query) {
-      if (looksLikePhone(query)) phoneNo = query;
-      else appointCode = query;
-    }
-
-    if (phoneNo) phoneNo = normalizePhoneDigits(phoneNo);
     if (!appointCode && !phoneNo) {
       return jsonError("請輸入預約密碼或手機號碼");
     }
 
     const range = getAppointQueryRangeTaipei();
-    // 不帶 appointState：此環境 number 0 常空回；字串 "0" 又會混入已結束
     const queries: Array<ReturnType<typeof listAppointments>> = [];
     if (appointCode) queries.push(listAppointments({ appointCode, ...range }));
     if (phoneNo) {
@@ -68,10 +64,23 @@ export const POST = async (request: Request) => {
       if (query) queries.push(listAppointments({ appointCode: query, ...range }));
     }
 
-    const merged = mergeByAppointId(
-      (await Promise.all(queries)).map((r) => r.list ?? []),
-    );
+    const [appointLists, onSiteResult] = await Promise.all([
+      Promise.all(queries),
+      lookupOnSiteRecords({ phoneNo, appointCode }).catch(() => ({
+        records: [],
+        appointNotFound: false,
+      })),
+    ]);
 
+    const tempOutRecords = onSiteResult.records.filter(
+      (item) => item.presence === "temp_out",
+    );
+    if (tempOutRecords.length > 0) {
+      return jsonOk({ appointments: [], tempOutRecords });
+    }
+
+    const onSiteCount = onSiteResult.records.length;
+    const merged = mergeByAppointId(appointLists.map((r) => r.list ?? []));
     const matched = merged.filter((item) => {
       const code = String(item.appointCode ?? "").trim();
       const itemPhone = normalizePhoneDigits(item.visitorInfo?.phoneNo ?? "");
@@ -80,45 +89,76 @@ export const POST = async (request: Request) => {
       if (phoneNo && query && code === query) return true;
       return false;
     });
-
-    if (matched.length === 0) {
-      return jsonError(
-        "查無此預約資訊，請聯繫接待員工建立預約，或改由「訪客預約」申請",
-        404,
-      );
-    }
-
     const pending = matched.filter((item) =>
       isPendingCheckin(item.appointStatus),
     );
+
     if (pending.length === 0) {
+      if (onSiteCount > 0) return jsonError(alreadyOnSiteMessage, 409);
+      if (matched.length === 0) {
+        return jsonError(
+          "查無此預約資訊，請聯繫接待員工建立預約，或改由「訪客預約」申請",
+          404,
+        );
+      }
       return jsonError(statusMessage(matched[0]?.appointStatus), 409);
     }
 
-    return jsonOk({
-      appointments: pending.map((item) => {
-        const info = item.visitorInfo;
-        return {
-          token: createCheckinToken(item),
-          appointStartTime: item.appointStartTime ?? "",
-          appointEndTime: item.appointEndTime ?? "",
-          receptionistName: item.receptionistName ?? "",
-          visitorName: displayVisitorName(
-            info?.visitorFamilyName,
-            info?.visitorGivenName,
-            info?.visitorName,
-          ),
-          phoneNo: String(info?.phoneNo || phoneNo || "").trim(),
-          companyName: String(info?.companyName ?? "").trim(),
-          plateNo: normalizePlateNo(info?.plateNo),
-          visitReason: visitReasonLabel(
-            item.visitReasonType,
-            item.visitReasonDetail,
-            item.visitorReasonName,
-          ),
-        };
-      }),
-    });
+    const appointments = [];
+    for (const item of pending) {
+      const info = item.visitorInfo;
+      const visitorId = String(info?.visitorId ?? "").trim();
+      const itemPhone =
+        normalizePhoneDigits(info?.phoneNo ?? "") || phoneNo || "";
+      const plateNo =
+        normalizePlateNo(info?.plateNo) ||
+        (await lookupCachedPlate({
+          visitorId,
+          phoneNo: itemPhone,
+          appointId: item.appointID,
+        })) ||
+        "";
+
+      if (plateNo) {
+        await rememberPlate({
+          plateNo,
+          visitorId,
+          phoneNo: itemPhone,
+          appointId: item.appointID,
+        });
+      }
+
+      const tokenItem: AppointmentItem = {
+        ...item,
+        visitorInfo: {
+          ...info,
+          plateNo: plateNo || info?.plateNo || "",
+          phoneNo: itemPhone || info?.phoneNo,
+        },
+      };
+
+      appointments.push({
+        token: createCheckinToken(tokenItem),
+        appointStartTime: item.appointStartTime ?? "",
+        appointEndTime: item.appointEndTime ?? "",
+        receptionistName: item.receptionistName ?? "",
+        visitorName: displayVisitorName(
+          info?.visitorFamilyName,
+          info?.visitorGivenName,
+          info?.visitorName,
+        ),
+        phoneNo: itemPhone,
+        companyName: String(info?.companyName ?? "").trim(),
+        plateNo,
+        visitReason: visitReasonLabel(
+          item.visitReasonType,
+          item.visitReasonDetail,
+          item.visitorReasonName,
+        ),
+      });
+    }
+
+    return jsonOk({ appointments });
   } catch (error) {
     return jsonError(
       error instanceof Error ? error.message : "查詢預約失敗",

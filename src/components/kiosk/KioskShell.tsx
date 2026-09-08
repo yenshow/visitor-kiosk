@@ -2,14 +2,15 @@
 
 import type { ReactNode } from "react";
 import { KioskHeader } from "@/components/kiosk/KioskHeader";
+import { DEFAULT_MARQUEE } from "@/lib/kiosk/ui-constants";
 
 type KioskShellProps = {
   children: ReactNode;
   hasCredentials?: boolean;
   layout?: "home" | "flow";
+  marquee?: string;
+  logoUrl?: string;
 };
-
-const DEFAULT_MARQUEE = "歡迎使用訪客服務機｜請選擇訪客報到、簽退或現場預約";
 
 const SHELL_MAIN_HOME =
   "mx-auto flex min-h-0 w-3/4 flex-1 flex-col pt-8 landscape:max-w-7xl landscape:pt-12";
@@ -17,6 +18,7 @@ const SHELL_MAIN_HOME =
 const SHELL_MAIN_FLOW =
   "mx-auto flex min-h-0 w-3/4 flex-1 flex-col py-3 landscape:max-w-7xl landscape:py-4";
 
+/** 跑馬燈對齊 ba SafetyBanner：固定 bg-blue-600，不隨主題變色 */
 const MarqueeBanner = ({ text }: { text: string }) => (
   <div
     className="shrink-0 overflow-hidden bg-blue-600 py-2"
@@ -41,18 +43,15 @@ export const KioskShell = ({
   children,
   hasCredentials = true,
   layout = "home",
+  marquee,
+  logoUrl,
 }: KioskShellProps) => {
   const isHome = layout === "home";
+  const marqueeText = marquee?.trim() || DEFAULT_MARQUEE;
 
   return (
-    <div className="flex h-dvh max-h-dvh flex-col overflow-hidden">
-      {isHome ? (
-        <MarqueeBanner
-          text={
-            process.env.NEXT_PUBLIC_KIOSK_MARQUEE?.trim() || DEFAULT_MARQUEE
-          }
-        />
-      ) : null}
+    <div className="flex h-dvh max-h-dvh flex-col overflow-hidden bg-(image:--shell-gradient) text-(--text-primary)">
+      {isHome ? <MarqueeBanner text={marqueeText} /> : null}
 
       <div className={isHome ? SHELL_MAIN_HOME : SHELL_MAIN_FLOW}>
         {!hasCredentials ? (
@@ -65,7 +64,7 @@ export const KioskShell = ({
           </div>
         ) : null}
 
-        {isHome ? <KioskHeader /> : null}
+        {isHome ? <KioskHeader logoUrl={logoUrl} /> : null}
 
         <div className="flex min-h-0 flex-1 flex-col justify-center">
           {children}

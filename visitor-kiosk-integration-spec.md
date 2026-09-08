@@ -14,13 +14,15 @@
 - 時區一律 `Asia/Taipei`（ISO 8601 `+08:00`）。
 - 報到／簽退下一步動作用一次性 token（記憶體、10 分鐘）；前端不帶 `appointID` 直打 Artemis。
 - YSOP 本地狀態檔：`data/kiosk-presence.json`（臨時外出、今日離場）。
+- YSOP 本機設定：`data/kiosk-settings.json`（跑馬燈、訪客預約開關、明暗主題、自訂 logo 檔名）；logo 檔 `data/kiosk-logo.*`。
+- 設定頁路由：`/setting`（不在首頁顯示設定按鈕）。主題以 `html.dark` + CSS 變數實作，並以 cookie `theme` 搭配 `public/theme-init.js` 防閃爍。
 - **前端對外敘述一律稱 YSCP**；程式碼／環境變數可保留 HCP 前綴。
 
 ## 2. 業務流程
 
-首頁三個入口：**訪客報到**、**訪客簽退**、**訪客預約**；並顯示統計：目前在場、臨時外出、今日離場（有車牌時附場內車／外出車）。
+首頁入口：**訪客報到**、**訪客簽退**，以及可關閉的**訪客預約**；並顯示統計：目前在場、臨時外出、今日離場。點統計格可開啟訪客紀錄對話框。本機設定請至 `/setting`（跑馬燈、明暗主題、公司 logo、是否顯示現場預約）。
 
-預約可來自 YSCP Web 或現場 Kiosk。現場預約送出後不顯示密碼，須等內部確認；確認後訪客再用密碼或手機報到。
+預約可來自 YSCP Web 或現場 Kiosk（若設定開啟）。現場預約送出後不顯示密碼，須等內部確認；確認後訪客再用密碼或手機報到。
 
 ### 2.1 訪客預約
 
@@ -29,23 +31,25 @@
 3. 後端建立 YSCP 預約（可帶 `plateNo`），再讀自動審核設定，顯示「等待內部確認」。
 4. 不需同意訪客須知。
 
-### 2.2 訪客報到
+### 2.2 訪客報到（含臨時外出返回）
 
 1. 數字鍵盤輸入預約密碼或手機號碼。
-2. 後端查當天前後一日預約，只允許 `appointStatus = 0`（待簽到）。
-3. 多筆時由訪客點選；確認後須同意訪客須知。
-4. 後端簽到，並非同步呼叫權限重發（失敗不擋報到）。
-5. 畫面顯示「報到成功，請等候帶領」；不顯示 QR Code。
+2. 若該訪客為 **臨時外出中**：回傳在廠記錄，畫面顯示「臨時外出」，可「確認返回」（無需再同意須知、不重打 YSCP 簽到）。
+3. 否則查當天前後一日預約，只允許 `appointStatus = 0`（待簽到）。
+4. 多筆時由訪客點選；確認後須同意訪客須知。
+5. 後端簽到，並非同步呼叫權限重發（失敗不擋報到）。
+6. 畫面顯示「報到成功，請等候帶領」；不顯示 QR Code。
+7. 若已在場（非臨時外出）：提示改走「訪客簽退」。
 
-### 2.3 訪客簽退（正式／臨時外出／返回）
+### 2.3 訪客簽退（正式／臨時外出）
 
 1. 輸入預約密碼或手機號碼；回傳**全部**符合的在廠者（共乘可勾選）。
 2. 每筆含 `presence: "on_site" | "temp_out"` 與選填 `plateNo`。
 3. **在場**：可選「臨時外出」或「正式簽退」。
-4. **臨時外出中**：可選「確認返回」或「正式簽退」。
+4. **臨時外出中**：僅可「正式簽退」；返回請走訪客報到。
 5. 模式：
-   - `temp`：只寫 YSOP `TEMP_OUT`，嘗試出口一次性放行（adapter，未接 API 時 no-op），**不**呼叫 `visitor/out`。入口 LPR 維持預約時段。
-   - `return`：清除 `TEMP_OUT`；YSCP 不需異動。
+   - `temp`：只寫 YSOP `TEMP_OUT`，嘗試出口一次性放行（adapter，未接 API 時 no-op），**不**呼叫 `visitor/out`。入口 LPR 維持預約時段。返回須至訪客報到。
+   - `return`：由訪客報到呼叫，清除 `TEMP_OUT`；YSCP 不需異動。
    - `final`：呼叫 `visitor/out`、清除 `TEMP_OUT`、記今日離場；人員門禁撤銷。入口車牌時段仍由 YSCP 控管至預約結束。
 
 無操作倒數秒數由 `NEXT_PUBLIC_KIOSK_IDLE_SECONDS` 控制（預設 20）。
@@ -59,7 +63,20 @@
 | TEMP_OUT | YSCP 仍在廠，YSOP 已記臨時外出 |
 | CHECKED_OUT | 已呼叫 `visitor/out`，並記入今日離場 |
 
-車輛（有車牌才計）：ON_SITE → 場內；TEMP_OUT → 外出中。
+車輛狀態僅作紀錄欄位顯示車牌；不再另計「場內車／外出車」統計。
+
+### 2.5 本機設定與訪客紀錄
+
+設定（無需登入，寫入本機檔）：
+
+| 項目 | 說明 |
+|------|------|
+| 跑馬燈 | 空則回退 `NEXT_PUBLIC_KIOSK_MARQUEE`／預設文案 |
+| 顯示模式 | `theme`: `light`｜`dark`，預設 `light`；寫入 cookie 供首屏套用 |
+| 公司 logo | 上傳至 `data/kiosk-logo.*`；未設定則用 `public/yenshow-logo.svg` |
+| 顯示訪客預約 | `showAppoint`，預設 true |
+
+訪客紀錄對話框：上方今日摘要（與 stats 同源）＋明細表（在場／臨時外出／今日離場）。可篩選狀態、搜尋姓名／手機／車牌、分頁。不匯出 CSV、無截圖。
 
 ---
 
@@ -71,14 +88,19 @@
 |------|------|------|
 | GET | `/api/kiosk/status` | 是否已設定 YSCP 金鑰 |
 | GET | `/api/kiosk/stats` | 在場／臨時外出／今日離場（含車輛數） |
+| GET | `/api/kiosk/records` | 訪客紀錄明細（在場／外出／今日離場） |
+| GET | `/api/kiosk/settings` | 本機設定視圖（跑馬燈、主題、預約開關、logoUrl）；並 Set-Cookie `theme` |
+| PUT | `/api/kiosk/settings` | 更新 `{ marquee?, showAppoint?, theme? }`；並 Set-Cookie `theme` |
+| GET | `/api/kiosk/settings/logo` | 自訂 logo 二進位（無則 404） |
+| POST | `/api/kiosk/settings/logo` | multipart 上傳 `file`；或 `reset=1` 恢復預設 |
 | GET | `/api/kiosk/notice` | 訪客須知 Markdown（`content/visitor-notice.md`） |
 | GET | `/api/kiosk/orgs` | 部門清單（含路徑標籤） |
 | POST | `/api/kiosk/hosts` | 依部門載入被訪人 `{ orgIndexCode }` |
 | POST | `/api/kiosk/appoint` | 建立預約（可含 `plateNo`，無需須知） |
-| POST | `/api/kiosk/verify` | 報到查詢 `{ query }`（密碼或手機） |
+| POST | `/api/kiosk/verify` | 報到查詢 `{ query }`（密碼或手機）；臨時外出中回 `tempOutRecords` |
 | POST | `/api/kiosk/checkin` | 報到 `{ token, acceptedNotice: true }` |
 | POST | `/api/kiosk/checkout/lookup` | 簽退查詢 `{ query }` → 全部匹配 |
-| POST | `/api/kiosk/checkout` | `{ token, mode?: "temp"\|"return"\|"final" }` |
+| POST | `/api/kiosk/checkout` | `{ token, mode?: "temp"\|"return"\|"final" }`（`return` 由報到畫面呼叫） |
 
 ### 3.1 預約 `POST /api/kiosk/appoint`
 
@@ -93,9 +115,9 @@
 ### 3.2 報到查詢 `POST /api/kiosk/verify`
 
 `query` 依長度判斷為手機（8–15 位數字，`886` 轉 `0` 開頭）或預約密碼。  
-不傳 `appointState`。本端再比對密碼／手機，並只回待簽到。
+不傳 `appointState`。同時查在廠記錄：若為臨時外出，回 `tempOutRecords`（含 checkout token，供確認返回）。否則本端再比對密碼／手機，並只回待簽到。
 
-回傳每筆含 `token`、顯示欄位與選填 `plateNo`。
+回傳待簽到每筆含 `token`、顯示欄位與選填 `plateNo`。
 
 ### 3.3 簽退查詢 `POST /api/kiosk/checkout/lookup`
 
@@ -113,12 +135,22 @@
 {
   "onSite": 0,
   "tempOut": 0,
-  "departedToday": 0,
-  "vehicles": { "onSite": 0, "outing": 0 }
+  "departedToday": 0
 }
 ```
 
-公式：YSCP 在廠清單 − TEMP_OUT = onSite；TEMP_OUT 與在廠交集 = tempOut；departedToday 為當日台北日正式簽退筆數。重啟後與 YSCP 在廠清單對帳。
+公式：YSCP 在廠清單 − TEMP_OUT = onSite；TEMP_OUT 與在廠交集 = tempOut；departedToday 為當日台北日正式簽退筆數。重啟後與 YSCP 在廠清單對帳。車牌於報到／預約時寫入本機快取，因 YSCP 列表常回空 `plateNo`。
+
+### 3.6 訪客紀錄 `GET /api/kiosk/records`
+
+回傳 `{ summary, rows }`。`summary` 同 stats；`rows` 含 `presence`（`on_site`｜`temp_out`｜`departed`）、姓名、手機、車牌、公司、被訪人、時間。在場／外出來自 YSCP 在廠＋presence；離場來自 `departedToday`。
+
+### 3.7 本機設定
+
+- 頁面：`/setting`
+- `GET /api/kiosk/settings` → `{ marquee, resolvedMarquee, showAppoint, theme, hasCustomLogo, logoUrl }`（並 Set-Cookie `theme`）
+- `PUT /api/kiosk/settings` → 更新文字、預約開關、主題（並 Set-Cookie `theme`）
+- `POST /api/kiosk/settings/logo` → 上傳（PNG／JPG／SVG／WebP，≤2MB）或 `reset=1`
 
 ---
 

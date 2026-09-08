@@ -4,6 +4,7 @@ import {
 } from "@/lib/hcp/visitor-api";
 import { jsonError, jsonOk } from "@/lib/kiosk/api-helpers";
 import { normalizePlateNo } from "@/lib/kiosk/plate";
+import { rememberPlate } from "@/lib/kiosk/plate-cache";
 import { normalizePhoneDigits } from "@/lib/kiosk/phone";
 import { isValidEmail } from "@/lib/kiosk/visitor-fields";
 
@@ -72,6 +73,15 @@ export const POST = async (request: Request) => {
 
     if (Array.isArray(result.watchListInfo) && result.watchListInfo.length > 0) {
       return jsonError("預約需現場人員協助處理，請洽接待櫃台", 409);
+    }
+
+    if (plateNo) {
+      await rememberPlate({
+        plateNo,
+        phoneNo,
+        visitorId: result.visitorId,
+        appointId: result.appointRecordId,
+      });
     }
 
     const automaticApproval = await getAutomaticApproval();
