@@ -9,10 +9,9 @@ import path from "path";
 import { createInterface } from "readline";
 import { fileURLToPath } from "url";
 import {
+  buildYscpEventDest,
   getConfig,
-  KIOSK_LISTEN_PORT,
   YSCP_EVENT_TOKEN_DEFAULT,
-  YSCP_EVENT_WEBHOOK_PATH,
 } from "../src/lib/config";
 import type { ExitLane } from "../src/lib/kiosk/exit-lanes";
 import { ensureEventSubscription } from "../src/lib/yscp/event-api";
@@ -107,14 +106,18 @@ const askIndex = async (label: string, max: number) => {
   }
 };
 
+const isYesNo = (raw: string) =>
+  ["y", "yes", "n", "no"].includes(raw.toLowerCase());
+
 const askOrKeep = async (label: string, current: string, secret = false) => {
-  const hint = current
-    ? secret
+  const hint = !current
+    ? "未設"
+    : secret
       ? "已設定，Enter 保留"
-      : current
-    : "未設";
+      : `${current}，Enter 保留`;
   const answer = await ask(`${label} [${hint}]: `);
-  return answer || current;
+  if (!answer || (current && isYesNo(answer))) return current;
+  return answer;
 };
 
 const upsertEnvLine = (key: string, value: string) => {
@@ -259,15 +262,22 @@ const runInit = async () => {
 
   console.log("\n[2/4] 事件 Webhook（YSCP 必須能連到此 URL）");
   const currentDest = process.env.YSCP_EVENT_DEST ?? "";
+  const lanDests = listLanIps().map((ip) => buildYscpEventDest(ip));
+  const preferredCurrent =
+    currentDest.startsWith("https://")
+      ? currentDest.replace(/^https:\/\//i, "http://")
+      : currentDest;
   const candidates = [
     ...new Set([
-      ...(currentDest ? [currentDest] : []),
-      ...listLanIps().map(
-        (ip) =>
-          `https://${ip}:${KIOSK_LISTEN_PORT}${YSCP_EVENT_WEBHOOK_PATH}`,
-      ),
+      ...(preferredCurrent ? [preferredCurrent] : []),
+      ...lanDests,
     ]),
   ];
+  if (currentDest.startsWith("https://")) {
+    console.log(
+      "[!] 區網建議用 HTTP（YSCP 對自簽 HTTPS 常 SSL Handshake Failure）",
+    );
+  }
   candidates.forEach((url, i) => console.log(`  ${i + 1}. ${url}`));
   const customIndex = candidates.length + 1;
   console.log(`  ${customIndex}. 自行輸入`);
@@ -280,20 +290,25 @@ const runInit = async () => {
     console.error("[-] 缺少 YSCP_EVENT_DEST");
     process.exit(1);
   }
-  const eventToken = await askOrKeep(
-    "YSCP_EVENT_TOKEN",
-    process.env.YSCP_EVENT_TOKEN || YSCP_EVENT_TOKEN_DEFAULT,
-  );
   upsertEnvLine("YSCP_EVENT_DEST", eventDest);
   upsertEnvLine(
     "YSCP_EVENT_TOKEN",
-    eventToken || YSCP_EVENT_TOKEN_DEFAULT,
+    process.env.YSCP_EVENT_TOKEN || YSCP_EVENT_TOKEN_DEFAULT,
   );
 
   logYscpTarget();
 
   console.log("\n[3/4] 出口相機與繼電器");
-  writeLanes(await selectExitLanes());
+  try {
+    writeLanes(await selectExitLanes());
+  } catch (error) {
+    const host = getConfig().yscp.hostname;
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error(
+      `[-] 連不上 YSCP（${host}）：${msg}`,
+    );
+    process.exit(1);
+  }
 
   console.log("\n[4/4] 訂閱車牌事件 131622");
   try {

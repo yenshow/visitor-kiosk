@@ -10,6 +10,11 @@ export const YSCP_REJECT_UNAUTHORIZED = false;
 export const YSCP_EVENT_TOKEN_DEFAULT = "Aa83124007";
 export const KIOSK_LISTEN_PORT = 3010;
 export const YSCP_EVENT_WEBHOOK_PATH = "/api/yscp/events";
+/** 區網推送用 HTTP：YSCP 對 kiosk 自簽 HTTPS 常 SSL Handshake Failure */
+export const YSCP_EVENT_DEST_SCHEME = "http";
+
+export const buildYscpEventDest = (host: string): string =>
+  `${YSCP_EVENT_DEST_SCHEME}://${host}:${KIOSK_LISTEN_PORT}${YSCP_EVENT_WEBHOOK_PATH}`;
 
 const env = (key: string): string => String(process.env[key] ?? "").trim();
 

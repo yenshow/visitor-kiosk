@@ -104,6 +104,6 @@ HTTPS POST，`Content-Type: application/json;charset=UTF-8`。成功 `code === "
 | 事件訂閱 | `/artemis/api/eventService/v1/eventSubscriptionByEventTypes`（`131622`） |
 | 開閘 | `/artemis/api/resource/v1/alarmOutput/controlling`（`action: 1`） |
 
-出口開閘：啟動或 `POST /api/kiosk/yscp/subscribe` 訂閱 → YSCP 推 `POST /api/yscp/events` → 只處理 `YSCP_EXIT_LANES` 相機、比對出場名單、5 秒去重後開閘。YSCP 須能連到 `YSCP_EVENT_DEST`。
+出口開閘：啟動或 `POST /api/kiosk/yscp/subscribe` 訂閱 → YSCP 推 `POST /api/yscp/events` → 只處理 `YSCP_EXIT_LANES` 相機、比對出場名單、5 秒去重後開閘。YSCP 須能連到 `YSCP_EVENT_DEST`（區網請用 HTTP，避免自簽 HTTPS 握手失敗）。
 
 來訪事由：0 商務、1 培訓、2 來訪、3 會議、4 施工。報到 `visitPurposeType` 沿用預約 `visitReasonType`。
