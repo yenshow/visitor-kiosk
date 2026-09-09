@@ -27,7 +27,6 @@
 
 # YSOP 現場狀態／設定（運行時寫入）
 /data/kiosk-presence.json
-/data/kiosk-plates.json
 /data/kiosk-settings.json
 /data/kiosk-logo.*
 

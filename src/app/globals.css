@@ -2,8 +2,17 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-@theme {
-  --animate-marquee: marquee-scroll 30s linear infinite;
+@keyframes marquee-scroll {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-33.333%, 0, 0);
+  }
+}
+
+.kiosk-marquee-track {
+  animation: marquee-scroll 30s linear infinite;
 }
 
 /*
@@ -106,12 +115,6 @@ button,
 [role="radio"],
 [role="checkbox"] {
   user-select: none;
-}
-
-@keyframes marquee-scroll {
-  to {
-    transform: translate3d(-33.333%, 0, 0);
-  }
 }
 
 .kiosk-tile-primary {

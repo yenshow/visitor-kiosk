@@ -34,6 +34,8 @@ export const SettingsForm = ({ initial, onSaved }: SettingsFormProps) => {
   );
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [resetConfirm, setResetConfirm] = useState(false);
   const [error, setError] = useState("");
   const [savedHint, setSavedHint] = useState("");
 
@@ -80,6 +82,7 @@ export const SettingsForm = ({ initial, onSaved }: SettingsFormProps) => {
     setSaving(true);
     setError("");
     setSavedHint("");
+    setResetConfirm(false);
     try {
       const res = await fetch("/api/kiosk/settings", {
         method: "PUT",
@@ -102,6 +105,29 @@ export const SettingsForm = ({ initial, onSaved }: SettingsFormProps) => {
       setError("儲存失敗");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleResetStats = async () => {
+    setResetting(true);
+    setError("");
+    setSavedHint("");
+    try {
+      const res = await fetch("/api/kiosk/records/reset", { method: "POST" });
+      const json = (await res.json()) as {
+        msg?: string;
+        data?: { message?: string };
+      };
+      if (!res.ok) {
+        setError(json.msg || "重置失敗");
+        return;
+      }
+      setResetConfirm(false);
+      setSavedHint(json.data?.message || "已重置訪客統計");
+    } catch {
+      setError("重置失敗");
+    } finally {
+      setResetting(false);
     }
   };
 
@@ -242,6 +268,49 @@ export const SettingsForm = ({ initial, onSaved }: SettingsFormProps) => {
           />
         </span>
       </button>
+
+      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+        <h3 className="text-lg font-semibold text-amber-950">重置訪客統計</h3>
+        <p className="mt-2 text-base text-amber-900">
+          清空本機臨時外出、已離場與在場快取。不影響 YSCP 在廠狀態。
+        </p>
+        {resetConfirm ? (
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="min-h-12 rounded-xl bg-red-600 px-4 text-base font-semibold text-white active:bg-red-700 disabled:opacity-50"
+              aria-label="確認重置訪客統計"
+              disabled={resetting}
+              onClick={() => void handleResetStats()}
+            >
+              {resetting ? "重置中…" : "確認重置"}
+            </button>
+            <button
+              type="button"
+              className="min-h-12 rounded-xl border border-slate-300 bg-white px-4 text-base font-semibold text-slate-700 active:bg-slate-100 disabled:opacity-50"
+              aria-label="取消重置"
+              disabled={resetting}
+              onClick={() => setResetConfirm(false)}
+            >
+              取消
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            className="mt-4 min-h-12 rounded-xl border border-amber-400 bg-white px-4 text-base font-semibold text-amber-900 active:bg-amber-100 disabled:opacity-50"
+            aria-label="重置訪客統計"
+            disabled={resetting || uploading || saving}
+            onClick={() => {
+              setError("");
+              setSavedHint("");
+              setResetConfirm(true);
+            }}
+          >
+            重置統計與紀錄
+          </button>
+        )}
+      </div>
 
       {error ? (
         <p className="text-lg text-red-600" role="alert">

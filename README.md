@@ -16,4 +16,4 @@ npm run dev
 - YSCP 設定（HOST／金鑰／Webhook／出口車道）：[docs/env-setup.md](docs/env-setup.md)
 - 流程、Kiosk API、Artemis：[docs/visitor-kiosk-integration-spec.md](docs/visitor-kiosk-integration-spec.md)
 
-本機畫面設定在 `/setting`（跑馬燈、主題、logo、是否顯示預約），寫入 `data/`。`.env` 勿打包進公開發佈物。
+本機畫面設定在 `/setting`（跑馬燈、主題、logo、是否顯示預約、重置訪客統計），寫入 `data/`。`.env` 勿打包進公開發佈物。

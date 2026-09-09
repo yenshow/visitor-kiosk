@@ -81,7 +81,7 @@ export const CodeQueryForm = ({
   <>
     <label className="block">
       <span className="mb-2 block text-sm font-medium text-slate-600">
-        預約密碼或手機號碼
+        預約號碼／密碼或手機號碼
       </span>
       <input
         className="min-h-16 w-full rounded-xl border border-slate-300 px-4 text-center text-3xl tracking-[0.35em] text-slate-900 placeholder:text-slate-400"
@@ -89,7 +89,7 @@ export const CodeQueryForm = ({
         readOnly
         inputMode="none"
         placeholder="請用下方鍵盤輸入"
-        aria-label="預約密碼或手機號碼"
+        aria-label="預約號碼／密碼或手機號碼"
       />
     </label>
 

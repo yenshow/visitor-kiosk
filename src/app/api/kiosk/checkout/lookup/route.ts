@@ -11,7 +11,7 @@ export const POST = async (request: Request) => {
     const { phoneNo, appointCode } = parseVisitorQuery(body);
 
     if (!phoneNo && !appointCode) {
-      return jsonError("請輸入預約密碼或手機號碼");
+      return jsonError("請輸入預約號碼／密碼或手機號碼");
     }
 
     const result = await lookupOnSiteRecords({ phoneNo, appointCode });

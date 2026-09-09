@@ -89,11 +89,11 @@ export const CheckoutFlow = ({ idleSeconds, onHome }: CheckoutFlowProps) => {
     setActing(true);
     setError("");
     try {
-      const message = await postCheckoutModes(
+      const result = await postCheckoutModes(
         selected.map((item) => item.token),
         mode,
       );
-      setDoneMessage(message);
+      setDoneMessage(result.message);
       setDoneMode(mode);
     } catch (err) {
       setError(err instanceof Error ? err.message : "操作失敗");

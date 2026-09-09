@@ -55,7 +55,7 @@ export const VisitorSelectCard = ({
             : "bg-emerald-100 text-emerald-800"
         }`}
       >
-        {item.presence === "temp_out" ? "臨時外出" : "在場"}
+        {item.presence === "temp_out" ? "臨時外出" : "在場中"}
       </span>
     </div>
   </button>

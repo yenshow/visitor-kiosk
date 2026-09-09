@@ -1,7 +1,6 @@
 import type { AppointmentItem } from "@/lib/yscp/visitor-api";
 import { normalizePhoneDigits } from "@/lib/kiosk/phone";
 import { normalizePlateNo } from "@/lib/kiosk/plate";
-import { buildPlateCacheIndex } from "@/lib/kiosk/plate-cache";
 import type { VisitorMetaEntry } from "@/lib/kiosk/presence";
 import type { FlatRegisterRecord } from "@/lib/kiosk/register-record";
 import { displayVisitorName } from "@/lib/kiosk/visitor-fields";
@@ -13,6 +12,7 @@ export type AppointEnrichment = {
   plateNo: string;
   companyName: string;
   receptionistName: string;
+  visitEndTime: string;
 };
 
 /** 已簽到優先，再取較新的 appointID */
@@ -43,6 +43,7 @@ export const buildAppointEnrichmentIndex = (list: AppointmentItem[]) => {
       plateNo: normalizePlateNo(info?.plateNo),
       companyName: String(info?.companyName ?? "").trim(),
       receptionistName: String(item.receptionistName ?? "").trim(),
+      visitEndTime: String(item.appointEndTime ?? "").trim(),
     };
 
     if (visitorId && !byVisitorId.has(visitorId)) {
@@ -69,13 +70,12 @@ export const findAppointEnrichment = (
   return null;
 };
 
-/** meta／車牌快取 > 在廠紀錄 > 預約補齊 */
+/** meta（報到後本機紀錄）> 在廠紀錄 > 預約補齊 */
 export const mergeRegisterFields = (
   flat: FlatRegisterRecord,
   options?: {
     enrich?: AppointEnrichment | null;
     meta?: VisitorMetaEntry | null;
-    cachedPlate?: string | null;
   },
 ): FlatRegisterRecord => {
   const enrich = options?.enrich;
@@ -90,9 +90,13 @@ export const mergeRegisterFields = (
   return {
     ...flat,
     visitorName: metaName || enrichName || flat.visitorName,
+    phoneNo:
+      normalizePhoneDigits(meta?.phoneNo ?? "") ||
+      normalizePhoneDigits(flat.phoneNo) ||
+      normalizePhoneDigits(enrich?.phoneNo ?? "") ||
+      "",
     plateNo:
       normalizePlateNo(meta?.plateNo) ||
-      normalizePlateNo(options?.cachedPlate) ||
       flat.plateNo ||
       normalizePlateNo(enrich?.plateNo) ||
       "",
@@ -106,32 +110,24 @@ export const mergeRegisterFields = (
       flat.receptionistName ||
       String(enrich?.receptionistName ?? "").trim() ||
       "",
+    visitEndTime:
+      flat.visitEndTime || String(enrich?.visitEndTime ?? "").trim() || "",
   };
 };
 
-/** 在廠清單補齊被訪人／車牌／公司（預約 + 本機快取） */
+/** 在廠清單補齊：優先用報到後 visitorMeta */
 export const enrichRegisterList = async (
   list: FlatRegisterRecord[],
   appointments: AppointmentItem[] | undefined,
   visitorMeta: VisitorMetaEntry[],
-  plateIndex?: Awaited<ReturnType<typeof buildPlateCacheIndex>>,
 ): Promise<FlatRegisterRecord[]> => {
   const index = buildAppointEnrichmentIndex(appointments ?? []);
-  const plates = plateIndex ?? (await buildPlateCacheIndex());
   const metaById = new Map(visitorMeta.map((item) => [item.recordId, item]));
 
-  return list.map((flat) => {
-    const phone = normalizePhoneDigits(flat.phoneNo);
-    const cachedPlate =
-      plates.byRecordId.get(flat.recordId) ||
-      (flat.visitorId ? plates.byVisitorId.get(flat.visitorId) : undefined) ||
-      (phone ? plates.byPhone.get(phone) : undefined) ||
-      "";
-
-    return mergeRegisterFields(flat, {
+  return list.map((flat) =>
+    mergeRegisterFields(flat, {
       enrich: findAppointEnrichment(index, flat),
       meta: metaById.get(flat.recordId),
-      cachedPlate,
-    });
-  });
+    }),
+  );
 };

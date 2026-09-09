@@ -5,6 +5,10 @@ import { FlowCard, FlowResult } from "@/components/kiosk/FlowCard";
 import { CodeQueryForm } from "@/components/kiosk/NumericKeypad";
 import { VisitorNoticeDialog } from "@/components/kiosk/VisitorNoticeDialog";
 import { VisitorSelectList } from "@/components/kiosk/VisitorSelectCard";
+import {
+  taipeiDateKeyFromIso,
+  toTaipeiDateKey,
+} from "@/lib/kiosk/api-helpers";
 import { formatDateTimeRange } from "@/lib/kiosk/format";
 import {
   postCheckoutModes,
@@ -32,6 +36,17 @@ type CheckinFlowProps = {
 
 type DoneMode = "checkin" | "return";
 
+/** 臨時外出非當日（跨日）返回須再同意須知；缺時間則保守要求同意 */
+const needsOvernightNotice = (records: OnSiteRecordView[]): boolean => {
+  const today = toTaipeiDateKey();
+  return records.some((item) => {
+    const at = String(item.tempOutAt ?? "").trim();
+    if (!at) return true;
+    const day = taipeiDateKeyFromIso(at);
+    return !day || day !== today;
+  });
+};
+
 export const CheckinFlow = ({
   idleSeconds,
   onHome,
@@ -45,6 +60,7 @@ export const CheckinFlow = ({
   const [tempOutRecords, setTempOutRecords] = useState<OnSiteRecordView[]>([]);
   const [selectedTokens, setSelectedTokens] = useState<string[]>([]);
   const [noticeOpen, setNoticeOpen] = useState(false);
+  const [noticeKind, setNoticeKind] = useState<"checkin" | "return">("checkin");
   const [acting, setActing] = useState(false);
   const [doneMode, setDoneMode] = useState<DoneMode | null>(null);
   const [doneMessage, setDoneMessage] = useState("");
@@ -53,6 +69,10 @@ export const CheckinFlow = ({
     () => tempOutRecords.filter((item) => selectedTokens.includes(item.token)),
     [tempOutRecords, selectedTokens],
   );
+  const returnNeedsNotice = useMemo(
+    () => needsOvernightNotice(selectedTempOut),
+    [selectedTempOut],
+  );
 
   const handleResetQuery = () => {
     setError("");
@@ -60,6 +80,7 @@ export const CheckinFlow = ({
     setSelected(null);
     setTempOutRecords([]);
     setSelectedTokens([]);
+    setNoticeOpen(false);
   };
 
   const handleVerify = async () => {
@@ -111,17 +132,32 @@ export const CheckinFlow = ({
     setActing(true);
     setError("");
     try {
-      const message = await postCheckoutModes(
+      const result = await postCheckoutModes(
         selectedTempOut.map((item) => item.token),
         "return",
       );
-      setDoneMessage(message || "已確認返回，狀態恢復為在場。");
+      setNoticeOpen(false);
+      setDoneMessage(result.message || "已確認返回，狀態恢復為在場。");
       setDoneMode("return");
     } catch (err) {
       setError(err instanceof Error ? err.message : "操作失敗");
+      setNoticeOpen(false);
     } finally {
       setActing(false);
     }
+  };
+
+  const handleReturnClick = () => {
+    if (selectedTempOut.length === 0) {
+      setError("請選擇至少一位訪客");
+      return;
+    }
+    if (returnNeedsNotice) {
+      setNoticeKind("return");
+      setNoticeOpen(true);
+      return;
+    }
+    void handleReturn();
   };
 
   const handleCheckin = async () => {
@@ -205,6 +241,11 @@ export const CheckinFlow = ({
             ? "找到多位臨時外出訪客（共乘請勾選要返回的人）"
             : "您目前為臨時外出，請確認資料後返回"}
         </p>
+        {returnNeedsNotice && selectedTempOut.length > 0 ? (
+          <p className="mb-3 text-base text-amber-800" role="status">
+            跨日返回須再次閱讀並同意訪客須知
+          </p>
+        ) : null}
 
         <VisitorSelectList
           items={tempOutRecords}
@@ -233,13 +274,26 @@ export const CheckinFlow = ({
           <button
             type="button"
             className="min-h-16 w-full rounded-xl border-2 border-emerald-600 bg-white text-xl font-bold text-emerald-700 active:bg-emerald-50 disabled:bg-slate-100 disabled:text-slate-400"
-            aria-label="確認返回"
+            aria-label={returnNeedsNotice ? "確認返回並同意須知" : "確認返回"}
             disabled={acting || selectedTempOut.length === 0}
-            onClick={() => void handleReturn()}
+            onClick={handleReturnClick}
           >
-            {acting ? "處理中…" : "確認返回"}
+            {acting
+              ? "處理中…"
+              : returnNeedsNotice
+                ? "確認返回（需同意須知）"
+                : "確認返回"}
           </button>
         </div>
+
+        {noticeOpen && noticeKind === "return" ? (
+          <VisitorNoticeDialog
+            confirmLabel="同意並確認返回"
+            loading={acting}
+            onCancel={() => setNoticeOpen(false)}
+            onConfirm={() => void handleReturn()}
+          />
+        ) : null}
       </FlowCard>
     );
   }
@@ -371,7 +425,10 @@ export const CheckinFlow = ({
               type="button"
               className="min-h-16 flex-1 rounded-xl bg-blue-600 text-xl font-bold text-white active:bg-blue-700"
               aria-label="確認報到"
-              onClick={() => setNoticeOpen(true)}
+              onClick={() => {
+                setNoticeKind("checkin");
+                setNoticeOpen(true);
+              }}
             >
               確認報到
             </button>
@@ -379,7 +436,7 @@ export const CheckinFlow = ({
         </>
       )}
 
-      {noticeOpen ? (
+      {noticeOpen && noticeKind === "checkin" ? (
         <VisitorNoticeDialog
           confirmLabel="同意並報到"
           loading={acting}

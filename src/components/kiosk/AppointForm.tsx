@@ -15,28 +15,27 @@ type AppointFormProps = {
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
-const toLocalDateTimeValue = (date: Date) =>
-  `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-
-const defaultDateTimes = () => {
-  const start = new Date();
-  start.setHours(9, 0, 0, 0);
-  const end = new Date();
-  end.setHours(18, 0, 0, 0);
-  return {
-    start: toLocalDateTimeValue(start),
-    end: toLocalDateTimeValue(end),
-  };
+/** 現場日 YYYY-MM-DD（以裝置本地日為準；機台應設台北時區） */
+const todayDateKey = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 };
+
+const todayLabel = () => {
+  const d = new Date();
+  return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())}`;
+};
+
+const defaultTimes = () => ({ start: "09:00", end: "18:00" });
 
 const FIELD_CLASS =
   "min-h-14 w-full rounded-xl border border-slate-300 bg-white px-4 text-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30";
 
-/** datetime-local（假設現場為台北時區）→ ISO 8601 +08:00 */
-const toTaipeiIsoFromLocal = (value: string): string => {
-  if (!value) return "";
-  const normalized = value.length === 16 ? `${value}:00` : value;
-  return `${normalized}+08:00`;
+/** 當日 HH:mm → ISO 8601 +08:00（僅限當日、不可跨日） */
+const toTaipeiIsoFromTodayTime = (time: string): string => {
+  const trimmed = String(time ?? "").trim();
+  if (!/^\d{2}:\d{2}$/.test(trimmed)) return "";
+  return `${todayDateKey()}T${trimmed}:00+08:00`;
 };
 
 export const AppointForm = ({ idleSeconds, onHome }: AppointFormProps) => {
@@ -47,8 +46,8 @@ export const AppointForm = ({ idleSeconds, onHome }: AppointFormProps) => {
   const [phone, setPhone] = useState("");
   const [plateNo, setPlateNo] = useState("");
   const [reasonType, setReasonType] = useState(0);
-  const [startAt, setStartAt] = useState(() => defaultDateTimes().start);
-  const [endAt, setEndAt] = useState(() => defaultDateTimes().end);
+  const [startAt, setStartAt] = useState(() => defaultTimes().start);
+  const [endAt, setEndAt] = useState(() => defaultTimes().end);
   const [selectedHost, setSelectedHost] = useState<HostPerson | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -80,8 +79,8 @@ export const AppointForm = ({ idleSeconds, onHome }: AppointFormProps) => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           receptionistId: selectedHost.personId,
-          appointStartTime: toTaipeiIsoFromLocal(startAt),
-          appointEndTime: toTaipeiIsoFromLocal(endAt),
+          appointStartTime: toTaipeiIsoFromTodayTime(startAt),
+          appointEndTime: toTaipeiIsoFromTodayTime(endAt),
           visitReasonType: reasonType,
           visitorFamilyName: familyNameTrimmed,
           visitorGivenName: givenNameTrimmed,
@@ -268,28 +267,31 @@ export const AppointForm = ({ idleSeconds, onHome }: AppointFormProps) => {
             })}
           </div>
         </div>
+        <p className="sm:col-span-2 text-base text-slate-600" role="status">
+          來訪日：{todayLabel()}（現場預約僅限當日，不可跨日）
+        </p>
         <label className="block">
           <span className="mb-1 block text-sm font-medium text-slate-600">
-            開始（日期時間）
+            開始時間
           </span>
           <input
-            type="datetime-local"
+            type="time"
             className={`${FIELD_CLASS} text-lg`}
             value={startAt}
             onChange={(e) => setStartAt(e.target.value)}
-            aria-label="開始日期時間"
+            aria-label="開始時間（僅限當日）"
           />
         </label>
         <label className="block">
           <span className="mb-1 block text-sm font-medium text-slate-600">
-            結束（日期時間）
+            結束時間
           </span>
           <input
-            type="datetime-local"
+            type="time"
             className={`${FIELD_CLASS} text-lg`}
             value={endAt}
             onChange={(e) => setEndAt(e.target.value)}
-            aria-label="結束日期時間"
+            aria-label="結束時間（僅限當日）"
           />
         </label>
       </div>

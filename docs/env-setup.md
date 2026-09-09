@@ -58,15 +58,17 @@ YSCP_EXIT_LANES=[{"cameraIndexCode":"1213","alarmOutputIndexCode":"1218"}]
 
 ### 寫死於程式（不必放進 `.env`）
 
-HTTPS 443、不驗證 TLS、逾時 30 秒、開閘去重 5 秒、無操作回首頁 20 秒。服務埠 **3010**。
+HTTPS 443、不驗證 TLS、逾時 30 秒、開閘去重 5 秒、離場開閘時限預設 15 分鐘、無操作回首頁 20 秒。服務埠 **3010**。
 
 ### Kiosk
 
 | 變數 | 說明 |
 |------|------|
-| `NEXT_PUBLIC_KIOSK_MARQUEE` | 首頁跑馬燈（`/setting` 可覆寫） |
+| `YSCP_EXIT_GATE_MINUTES` | 臨時外出／正式簽退後出口 LPR 可開閘分鐘數（預設 15） |
 | `NEXT_PUBLIC_NOTICE_VIDEO_URL` | 訪客須知影片 |
 | `ALLOWED_DEV_ORIGINS` | 開發模式允許的區網主機 |
+
+跑馬燈文案寫死於 `DEFAULT_MARQUEE`（`/setting` 可覆寫）。
 
 ---
 
@@ -74,7 +76,7 @@ HTTPS 443、不驗證 TLS、逾時 30 秒、開閘去重 5 秒、無操作回首
 
 | 狀況 | 處理 |
 |------|------|
-| 事件進來但不開閘 | `srcIndex`＝出口 `cameraIndexCode`；車牌在臨時外出或今日離場 |
+| 事件進來但不開閘 | `srcIndex`＝出口 `cameraIndexCode`；車牌在臨時外出或已離場，且登記後仍在 `YSCP_EXIT_GATE_MINUTES` 內 |
 | 訂閱失敗／收不到事件 | AK／SK；`YSCP_EVENT_DEST` 用 **http://**（非自簽 https）；`npm run setup:yscp -- subscribe` |
 | 開閘打到錯的閘 | `npm run setup:yscp -- lanes` |
 | 雙出口 | 設定時再新增一組，或重跑 `lanes` |

@@ -2,9 +2,13 @@ import {
   createAppointment,
   getAutomaticApproval,
 } from "@/lib/yscp/visitor-api";
-import { jsonError, jsonOk } from "@/lib/kiosk/api-helpers";
+import {
+  jsonError,
+  jsonOk,
+  taipeiDateKeyFromIso,
+  toTaipeiDateKey,
+} from "@/lib/kiosk/api-helpers";
 import { normalizePlateNo } from "@/lib/kiosk/plate";
-import { rememberPlate } from "@/lib/kiosk/plate-cache";
 import { normalizePhoneDigits } from "@/lib/kiosk/phone";
 import { isValidEmail } from "@/lib/kiosk/visitor-fields";
 
@@ -48,10 +52,20 @@ export const POST = async (request: Request) => {
       return jsonError("手機號碼格式不正確");
     }
     if (!appointStartTime || !appointEndTime) {
-      return jsonError("請選擇開始與結束日期時間");
+      return jsonError("請選擇開始與結束時間");
     }
     if (appointStartTime >= appointEndTime) {
       return jsonError("結束時間須晚於開始時間");
+    }
+
+    const today = toTaipeiDateKey();
+    const startDay = taipeiDateKeyFromIso(appointStartTime);
+    const endDay = taipeiDateKeyFromIso(appointEndTime);
+    if (!startDay || !endDay) {
+      return jsonError("開始或結束時間格式不正確");
+    }
+    if (startDay !== today || endDay !== today) {
+      return jsonError("現場預約僅限當日，不可跨日");
     }
 
     const result = await createAppointment({
@@ -73,15 +87,6 @@ export const POST = async (request: Request) => {
 
     if (Array.isArray(result.watchListInfo) && result.watchListInfo.length > 0) {
       return jsonError("預約需現場人員協助處理，請洽接待櫃台", 409);
-    }
-
-    if (plateNo) {
-      await rememberPlate({
-        plateNo,
-        phoneNo,
-        visitorId: result.visitorId,
-        appointId: result.appointRecordId,
-      });
     }
 
     const automaticApproval = await getAutomaticApproval();

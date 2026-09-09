@@ -99,11 +99,9 @@ export const updateSettings = async (
   return next;
 };
 
-/** 畫面用跑馬燈：本機設定 → env → 預設 */
+/** 畫面用跑馬燈：本機設定 → 寫死預設 */
 export const resolveMarquee = (settings: KioskSettings): string =>
-  settings.marquee.trim() ||
-  process.env.NEXT_PUBLIC_KIOSK_MARQUEE?.trim() ||
-  DEFAULT_MARQUEE;
+  settings.marquee.trim() || DEFAULT_MARQUEE;
 
 export const getLogoAbsolutePath = (
   logoFileName: string,

@@ -157,11 +157,13 @@ export const listAppointments = async (params: {
   appointEndTime: string;
   /** 不傳則不篩選狀態（簽退查密碼時需要） */
   appointState?: number | string;
+  pageSize?: number;
 }): Promise<AppointmentListData> => {
   const path = "/artemis/api/visitor/v1/appointment/appointmentlist";
+  const pageSize = Math.min(Math.max(Number(params.pageSize) || 100, 1), 500);
   const body: Record<string, unknown> = {
     pageNo: 1,
-    pageSize: 50,
+    pageSize,
     appointStartTime: params.appointStartTime,
     appointEndTime: params.appointEndTime,
   };

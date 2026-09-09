@@ -1,16 +1,13 @@
 import { reapplyAuth, registerCheckIn } from "@/lib/yscp/visitor-api";
 import { jsonError, jsonOk, toTaipeiIso } from "@/lib/kiosk/api-helpers";
 import { normalizePlateNo } from "@/lib/kiosk/plate";
-import {
-  lookupCachedPlate,
-  rememberPlate,
-} from "@/lib/kiosk/plate-cache";
-import { upsertVisitorMeta } from "@/lib/kiosk/presence";
+import { normalizePhoneDigits } from "@/lib/kiosk/phone";
 import {
   consumeCheckinToken,
   peekCheckinToken,
 } from "@/lib/kiosk/session";
 import { displayVisitorName } from "@/lib/kiosk/visitor-fields";
+import { recordVisitorAfterCheckin } from "@/lib/kiosk/visitor-record";
 
 type CheckinBody = {
   acceptedNotice?: boolean;
@@ -34,7 +31,8 @@ export const POST = async (request: Request) => {
     }
 
     const appointId = String(item.appointID ?? "").trim();
-    const visitorId = String(item.visitorInfo?.visitorId ?? "").trim();
+    const info = item.visitorInfo;
+    const visitorId = String(info?.visitorId ?? "").trim();
     if (!appointId || !visitorId) {
       return jsonError("預約資料不完整，請洽接待人員");
     }
@@ -42,16 +40,9 @@ export const POST = async (request: Request) => {
     const visitStartTime = toTaipeiIso(new Date());
     const visitEndTime =
       item.appointEndTime || visitStartTime.replace(/T.*/, "T23:59:59+08:00");
-
     const visitPurposeType = Number(item.visitReasonType ?? 0);
-    const info = item.visitorInfo;
-    const plateNo =
-      normalizePlateNo(info?.plateNo) ||
-      (await lookupCachedPlate({
-        visitorId,
-        phoneNo: info?.phoneNo,
-        appointId,
-      }));
+    const phoneNo = normalizePhoneDigits(info?.phoneNo ?? "");
+    const plateNo = normalizePlateNo(info?.plateNo);
 
     const result = await registerCheckIn({
       appointId,
@@ -69,34 +60,19 @@ export const POST = async (request: Request) => {
 
     consumeCheckinToken(token);
 
-    const recordId = String(result.appointRecordId ?? "").trim();
-    const visitorName = displayVisitorName(
-      info?.visitorFamilyName,
-      info?.visitorGivenName,
-      info?.visitorName,
-    );
-
-    if (recordId) {
-      await upsertVisitorMeta({
-        recordId,
-        visitorId,
-        visitorName,
-        phoneNo: info?.phoneNo,
-        plateNo,
-        companyName: info?.companyName,
-        receptionistName: item.receptionistName,
-      });
-    }
-
-    if (plateNo) {
-      await rememberPlate({
-        plateNo,
-        visitorId,
-        phoneNo: info?.phoneNo,
-        appointId,
-        recordId: recordId || undefined,
-      });
-    }
+    await recordVisitorAfterCheckin({
+      recordId: String(result.appointRecordId ?? "").trim(),
+      visitorId,
+      visitorName: displayVisitorName(
+        info?.visitorFamilyName,
+        info?.visitorGivenName,
+        info?.visitorName,
+      ),
+      phoneNo,
+      plateNo,
+      companyName: String(info?.companyName ?? "").trim(),
+      receptionistName: String(item.receptionistName ?? "").trim(),
+    });
 
     void reapplyAuth(visitorId).catch(() => undefined);
 

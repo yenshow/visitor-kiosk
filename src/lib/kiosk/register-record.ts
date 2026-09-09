@@ -95,6 +95,16 @@ export const flattenRegisterRecord = (
   };
 };
 
+/** 來訪結束時間尚未過（無結束時間則視為仍有效，避免誤排除） */
+export const isVisitNotEnded = (
+  visitEndTime: string,
+  nowMs = Date.now(),
+): boolean => {
+  const endMs = Date.parse(String(visitEndTime ?? "").trim());
+  if (!Number.isFinite(endMs)) return true;
+  return endMs >= nowMs;
+};
+
 export const flattenRegisterList = (
   list: VisitorRegisterRecord[] | undefined,
 ): FlatRegisterRecord[] =>

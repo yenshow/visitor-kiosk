@@ -2,6 +2,7 @@ import {
   parseExitLanes,
   type ExitLane,
 } from "@/lib/kiosk/exit-lanes";
+import { EXIT_GATE_MINUTES_DEFAULT } from "@/lib/kiosk/ui-constants";
 
 export const YSCP_HTTPS_PORT = 443;
 export const YSCP_TIMEOUT_MS = 30_000;
@@ -50,7 +51,15 @@ export type AppConfig = {
     eventToken: string;
     exitLanes: ExitLane[];
     gateDedupMs: number;
+    /** 離場開閘時限（分鐘） */
+    exitGateMinutes: number;
   };
+};
+
+const parsePositiveInt = (raw: string, fallback: number): number => {
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return fallback;
+  return Math.floor(n);
 };
 
 export const getConfig = (): AppConfig => {
@@ -71,6 +80,10 @@ export const getConfig = (): AppConfig => {
       eventToken: env("YSCP_EVENT_TOKEN") || YSCP_EVENT_TOKEN_DEFAULT,
       exitLanes: parseExitLanes(env("YSCP_EXIT_LANES")),
       gateDedupMs: YSCP_GATE_DEDUP_MS,
+      exitGateMinutes: parsePositiveInt(
+        env("YSCP_EXIT_GATE_MINUTES"),
+        EXIT_GATE_MINUTES_DEFAULT,
+      ),
     },
   };
 };

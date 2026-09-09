@@ -25,16 +25,16 @@ type RecordsDialogProps = {
 const PAGE_SIZE = 10;
 
 const PRESENCE_LABEL: Record<VisitorRecordRow["presence"], string> = {
-  on_site: "在場",
+  on_site: "在場中",
   temp_out: "臨時外出",
-  departed: "今日離場",
+  departed: "已離場",
 };
 
 const FILTER_OPTIONS: { value: RecordsFilter; label: string }[] = [
   { value: "all", label: "全部" },
-  { value: "on_site", label: "在場" },
+  { value: "on_site", label: "在場中" },
   { value: "temp_out", label: "臨時外出" },
-  { value: "departed", label: "今日離場" },
+  { value: "departed", label: "已離場" },
 ];
 
 export const RecordsDialog = ({
@@ -150,20 +150,20 @@ export const RecordsDialog = ({
           {summary ? (
             <div>
               <h3 className="mb-3 w-fit border-b-2 border-slate-400 pb-1 text-lg font-semibold text-slate-800">
-                今日摘要
+                統計摘要
               </h3>
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse border border-slate-200 text-left text-base">
                   <thead className="bg-slate-100 text-slate-700">
                     <tr>
                       <th className="border border-slate-200 px-3 py-2">
-                        目前在場
+                        在場中
                       </th>
                       <th className="border border-slate-200 px-3 py-2">
                         臨時外出
                       </th>
                       <th className="border border-slate-200 px-3 py-2">
-                        今日離場
+                        已離場
                       </th>
                     </tr>
                   </thead>
@@ -176,7 +176,7 @@ export const RecordsDialog = ({
                         {summary.tempOut}
                       </td>
                       <td className="border border-slate-200 px-3 py-2 tabular-nums">
-                        {summary.departedToday}
+                        {summary.departed}
                       </td>
                     </tr>
                   </tbody>

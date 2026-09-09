@@ -10,6 +10,9 @@ export type CheckoutSessionPayload = {
   appointRecordId: string;
   visitorName: string;
   plateNo: string;
+  phoneNo?: string;
+  companyName?: string;
+  receptionistName?: string;
 };
 
 type CheckoutSessionEntry = CheckoutSessionPayload & {
@@ -87,8 +90,8 @@ export const consumeCheckoutToken = (
   const entry = store.get(token);
   if (!entry) return null;
   store.delete(token);
-  const { appointRecordId, visitorName, plateNo } = entry;
-  return { appointRecordId, visitorName, plateNo };
+  const { expiresAt: _, ...payload } = entry;
+  return payload;
 };
 
 export const peekCheckoutToken = (
@@ -98,9 +101,6 @@ export const peekCheckoutToken = (
   prune(store);
   const entry = store.get(token);
   if (!entry) return null;
-  return {
-    appointRecordId: entry.appointRecordId,
-    visitorName: entry.visitorName,
-    plateNo: entry.plateNo,
-  };
+  const { expiresAt: _, ...payload } = entry;
+  return payload;
 };

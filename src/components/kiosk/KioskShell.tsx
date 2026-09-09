@@ -25,7 +25,7 @@ const MarqueeBanner = ({ text }: { text: string }) => (
     role="region"
     aria-label={text}
   >
-    <div className="flex w-max animate-marquee motion-reduce:animate-none">
+    <div className="kiosk-marquee-track flex w-max">
       {Array.from({ length: 3 }, (_, index) => (
         <span
           key={index}

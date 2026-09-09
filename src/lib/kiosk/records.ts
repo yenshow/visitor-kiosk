@@ -64,7 +64,7 @@ export const listVisitorRecords =
       });
     }
 
-    for (const item of snap.departedToday) {
+    for (const item of snap.departed) {
       rows.push({
         recordId: `departed-${item.recordId}`,
         presence: "departed",
@@ -73,10 +73,10 @@ export const listVisitorRecords =
           undefined,
           item.visitorName,
         ),
-        phoneNo: "",
+        phoneNo: item.phoneNo,
         plateNo: item.plateNo,
-        companyName: "",
-        receptionistName: "",
+        companyName: item.companyName,
+        receptionistName: item.receptionistName,
         at: item.at,
       });
     }

@@ -1,11 +1,5 @@
-import {
-  getVisitorRegisterRecords,
-  listAppointments,
-} from "@/lib/yscp/visitor-api";
-import {
-  getAppointQueryRangeTaipei,
-  getVisitQueryRangeTaipei,
-} from "@/lib/kiosk/api-helpers";
+import { findAppointmentsByQuery } from "@/lib/kiosk/appoint-lookup";
+import { getVisitQueryRangeTaipei } from "@/lib/kiosk/api-helpers";
 import { enrichRegisterList } from "@/lib/kiosk/appoint-enrichment";
 import { normalizePlateNo } from "@/lib/kiosk/plate";
 import { normalizePhoneDigits } from "@/lib/kiosk/phone";
@@ -16,6 +10,10 @@ import {
 } from "@/lib/kiosk/register-record";
 import { createCheckoutToken } from "@/lib/kiosk/session";
 import type { OnSiteRecordView } from "@/lib/kiosk/visitor-query";
+import {
+  getVisitorRegisterRecords,
+  type AppointmentItem,
+} from "@/lib/yscp/visitor-api";
 
 type OnSiteLookupResult = {
   records: OnSiteRecordView[];
@@ -24,23 +22,29 @@ type OnSiteLookupResult = {
 
 const toView = (
   flat: FlatRegisterRecord,
-  tempOutIds: Set<string>,
+  tempOutById: Map<string, { at: string }>,
 ): OnSiteRecordView => {
   const plateNo = normalizePlateNo(flat.plateNo);
   const visitorName = flat.visitorName || "—";
+  const phoneNo = normalizePhoneDigits(flat.phoneNo);
+  const tempOut = tempOutById.get(flat.recordId);
 
   return {
     token: createCheckoutToken({
       appointRecordId: flat.recordId,
       visitorName,
       plateNo,
+      phoneNo,
+      companyName: flat.companyName,
+      receptionistName: flat.receptionistName || "",
     }),
     visitorName,
-    phoneNo: normalizePhoneDigits(flat.phoneNo),
+    phoneNo,
     companyName: flat.companyName,
     receptionistName: flat.receptionistName || "",
     plateNo,
-    presence: tempOutIds.has(flat.recordId) ? "temp_out" : "on_site",
+    presence: tempOut ? "temp_out" : "on_site",
+    tempOutAt: tempOut?.at,
     visitStartTime: flat.visitStartTime || flat.registerTime,
     visitEndTime: flat.visitEndTime,
     visitingTime: flat.registerTime || flat.visitStartTime,
@@ -50,54 +54,59 @@ const toView = (
 export const lookupOnSiteRecords = async (input: {
   phoneNo: string;
   appointCode: string;
+  /** 若呼叫端已查過預約，傳入可避免重複打 YSCP */
+  appointments?: AppointmentItem[];
 }): Promise<OnSiteLookupResult> => {
-  const { phoneNo, appointCode } = input;
+  const phoneNo = normalizePhoneDigits(input.phoneNo);
+  const appointCode = String(input.appointCode ?? "").trim();
   if (!phoneNo && !appointCode) {
     return { records: [], appointNotFound: false };
   }
 
-  const [registerPayload, appointPayload] = await Promise.all([
-    getVisitorRegisterRecords(getVisitQueryRangeTaipei()),
-    appointCode
-      ? listAppointments({
-          appointCode,
-          ...getAppointQueryRangeTaipei(),
-        })
-      : listAppointments({ ...getAppointQueryRangeTaipei() }),
-  ]);
+  const appointList =
+    input.appointments ??
+    (await findAppointmentsByQuery({ phoneNo, appointCode }));
 
-  if (appointCode && !appointPayload.list?.[0]) {
+  if (appointCode && appointList.length === 0) {
     return { records: [], appointNotFound: true };
   }
 
-  const appointItem = appointPayload.list?.[0];
-  const filterVisitorId = appointCode
-    ? String(appointItem?.visitorInfo?.visitorId ?? "").trim()
-    : "";
-  const filterPhone =
-    (appointCode
-      ? normalizePhoneDigits(appointItem?.visitorInfo?.phoneNo ?? "")
-      : "") || phoneNo;
+  const filterVisitorIds = new Set(
+    appointList
+      .map((item) => String(item.visitorInfo?.visitorId ?? "").trim())
+      .filter(Boolean),
+  );
+  const filterPhones = new Set(
+    [
+      phoneNo,
+      ...appointList.map((item) =>
+        normalizePhoneDigits(item.visitorInfo?.phoneNo ?? ""),
+      ),
+    ].filter(Boolean),
+  );
 
-  const rawList = flattenRegisterList(registerPayload.list);
+  const rawList = flattenRegisterList(
+    (await getVisitorRegisterRecords(getVisitQueryRangeTaipei())).list,
+  );
   const presence = await getPresenceStore(
     new Set(rawList.map((item) => item.recordId)),
   );
   const onSiteList = await enrichRegisterList(
     rawList,
-    appointPayload.list,
+    appointList,
     presence.visitorMeta,
   );
-  const tempOutIds = new Set(presence.tempOut.map((item) => item.recordId));
+  const tempOutById = new Map(
+    presence.tempOut.map((item) => [item.recordId, { at: item.at }]),
+  );
 
   const records = onSiteList
     .filter((item) => {
-      if (filterVisitorId && item.visitorId === filterVisitorId) return true;
-      return Boolean(
-        filterPhone && normalizePhoneDigits(item.phoneNo) === filterPhone,
-      );
+      if (item.visitorId && filterVisitorIds.has(item.visitorId)) return true;
+      const itemPhone = normalizePhoneDigits(item.phoneNo);
+      return Boolean(itemPhone && filterPhones.has(itemPhone));
     })
-    .map((item) => toView(item, tempOutIds));
+    .map((item) => toView(item, tempOutById));
 
   return { records, appointNotFound: false };
 };

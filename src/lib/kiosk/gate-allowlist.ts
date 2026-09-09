@@ -4,24 +4,38 @@ import { normalizePlateNo } from "@/lib/kiosk/plate";
 
 export type ExitAllowReason = "temp_out" | "departed";
 
-/** 出場允許：臨時外出或當日正式簽退 */
+const isWithinExitWindow = (at: string, windowMs: number): boolean => {
+  const atMs = Date.parse(at);
+  if (!Number.isFinite(atMs)) return false;
+  const elapsed = Date.now() - atMs;
+  return elapsed >= 0 && elapsed <= windowMs;
+};
+
+/** 出場允許：臨時外出或正式簽退，且登記時間起算在開閘時限內 */
 export const isExitPlateAllowed = async (
   plateRaw: string,
 ): Promise<{ allowed: boolean; reason?: ExitAllowReason; plateNo: string }> => {
   const plateNo = normalizePlateNo(plateRaw);
   if (!plateNo) return { allowed: false, plateNo: "" };
 
+  const windowMs = getConfig().yscp.exitGateMinutes * 60_000;
   const store = await getPresenceStore();
-  if (store.tempOut.some((item) => normalizePlateNo(item.plateNo) === plateNo)) {
-    return { allowed: true, reason: "temp_out", plateNo };
-  }
-  if (
-    store.departedToday.some(
+
+  const lists: { reason: ExitAllowReason; items: { plateNo: string; at: string }[] }[] =
+    [
+      { reason: "temp_out", items: store.tempOut },
+      { reason: "departed", items: store.departed },
+    ];
+
+  for (const { reason, items } of lists) {
+    const hit = items.find(
       (item) => normalizePlateNo(item.plateNo) === plateNo,
-    )
-  ) {
-    return { allowed: true, reason: "departed", plateNo };
+    );
+    if (hit && isWithinExitWindow(hit.at, windowMs)) {
+      return { allowed: true, reason, plateNo };
+    }
   }
+
   return { allowed: false, plateNo };
 };
 

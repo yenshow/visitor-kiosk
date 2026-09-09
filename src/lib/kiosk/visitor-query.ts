@@ -10,6 +10,8 @@ export type OnSiteRecordView = {
   receptionistName: string;
   plateNo?: string;
   presence: OnSitePresence;
+  /** 臨時外出登記時間（ISO）；跨日返回需再同意須知 */
+  tempOutAt?: string;
   visitStartTime: string;
   visitEndTime: string;
   visitingTime?: string;
@@ -44,8 +46,9 @@ export const toggleSelectedToken = (tokens: string[], token: string) =>
 export const postCheckoutModes = async (
   tokens: string[],
   mode: "temp" | "return" | "final",
-) => {
+): Promise<{ message: string; exitGateMinutes: number | null }> => {
   let message = "";
+  let exitGateMinutes: number | null = null;
   for (const token of tokens) {
     const res = await fetch("/api/kiosk/checkout", {
       method: "POST",
@@ -54,10 +57,16 @@ export const postCheckoutModes = async (
     });
     const json = (await res.json()) as {
       msg?: string;
-      data?: { message?: string };
+      data?: { message?: string; exitGateMinutes?: number | null };
     };
     if (!res.ok) throw new Error(json.msg || "操作失敗");
     message = json.data?.message || message;
+    if (
+      typeof json.data?.exitGateMinutes === "number" &&
+      json.data.exitGateMinutes > 0
+    ) {
+      exitGateMinutes = json.data.exitGateMinutes;
+    }
   }
-  return message;
+  return { message, exitGateMinutes };
 };
