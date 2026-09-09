@@ -36,7 +36,7 @@ export const tryClaimGateDedup = (
   const camera = String(cameraIndexCode ?? "").trim();
   if (!plate || !camera) return false;
 
-  const dedupMs = getConfig().hcp.gateDedupMs;
+  const dedupMs = getConfig().yscp.gateDedupMs;
   const now = Date.now();
   for (const [key, at] of recentGateKeys) {
     if (now - at > dedupMs) recentGateKeys.delete(key);

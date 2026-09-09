@@ -1,7 +1,7 @@
 import {
   getVisitorRegisterRecords,
   listAppointments,
-} from "@/lib/hcp/visitor-api";
+} from "@/lib/yscp/visitor-api";
 import {
   getAppointQueryRangeTaipei,
   getVisitQueryRangeTaipei,

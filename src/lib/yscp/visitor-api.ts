@@ -1,10 +1,20 @@
 import { artemisPostSecure } from "./artemis-client";
-import { toHcpVisitorNames } from "@/lib/kiosk/visitor-fields";
+import { toYscpVisitorNames } from "@/lib/kiosk/visitor-fields";
 
-export type HcpApiResult<T> = {
+export type YscpApiResult<T> = {
   code: string;
   msg: string;
   data: T;
+};
+
+export const assertYscpOk = <T>(
+  result: YscpApiResult<T>,
+  fallbackMsg: string,
+): T => {
+  if (String(result?.code) !== "0") {
+    throw new Error(result?.msg || fallbackMsg);
+  }
+  return result.data;
 };
 
 export type VisitorInfo = {
@@ -16,7 +26,7 @@ export type VisitorInfo = {
   phoneNo?: string;
   companyName?: string;
   email?: string;
-  /** 車牌；部分 HCP 版本欄位名可能不同 */
+  /** 車牌；部分 YSCP 版本欄位名可能不同 */
   plateNo?: string;
 };
 
@@ -77,13 +87,6 @@ export type VisitorRegisterRecordListData = {
   records?: VisitorRegisterRecord[];
 };
 
-const assertSuccess = <T>(result: HcpApiResult<T>, fallbackMsg: string): T => {
-  if (String(result?.code) !== "0") {
-    throw new Error(result?.msg || fallbackMsg);
-  }
-  return result.data;
-};
-
 const optionalTrim = (value?: string): string | undefined => {
   const text = String(value ?? "").trim();
   return text || undefined;
@@ -109,7 +112,7 @@ export const createAppointment = async (body: {
   const path = "/artemis/api/visitor/v2/appointment";
   const info = body.visitorInfo;
   const plateNo = optionalTrim(info.plateNo);
-  const { data } = await artemisPostSecure<HcpApiResult<AppointResult>>(path, {
+  const { data } = await artemisPostSecure<YscpApiResult<AppointResult>>(path, {
     receptionistId: body.receptionistId,
     appointStartTime: body.appointStartTime,
     appointEndTime: body.appointEndTime,
@@ -118,7 +121,7 @@ export const createAppointment = async (body: {
     visitorInfoList: [
       {
         VisitorInfo: {
-          ...toHcpVisitorNames(info),
+          ...toYscpVisitorNames(info),
           gender: info.gender ?? 0,
           companyName: info.companyName ?? "",
           phoneNo: info.phoneNo ?? "",
@@ -129,16 +132,16 @@ export const createAppointment = async (body: {
     ],
   });
 
-  return assertSuccess(data, "建立預約失敗");
+  return assertYscpOk(data, "建立預約失敗");
 };
 
 export const getAutomaticApproval = async (): Promise<number | null> => {
   try {
     const path = "/artemis/api/visitor/v1/visitorConfig/automaticApproval";
     const { data } = await artemisPostSecure<
-      HcpApiResult<{ automaticApproval?: number }>
+      YscpApiResult<{ automaticApproval?: number }>
     >(path, {});
-    const payload = assertSuccess(data, "讀取自動審核設定失敗");
+    const payload = assertYscpOk(data, "讀取自動審核設定失敗");
     return typeof payload?.automaticApproval === "number"
       ? payload.automaticApproval
       : null;
@@ -166,17 +169,17 @@ export const listAppointments = async (params: {
   if (params.appointCode) body.appointCode = params.appointCode;
   if (params.phoneNo) body.phoneNo = params.phoneNo;
 
-  const { data } = await artemisPostSecure<HcpApiResult<AppointmentListData>>(
+  const { data } = await artemisPostSecure<YscpApiResult<AppointmentListData>>(
     path,
     body,
   );
-  return assertSuccess(data, "查詢預約失敗");
+  return assertYscpOk(data, "查詢預約失敗");
 };
 
 /**
  * 查詢在廠中（已簽到）的訪客登記記錄。
  * 注意：官方路徑拼寫為 getVistorRegisterRecord（少一個 i）。
- * 注意：此環境 HCP 可能忽略 phone／visitorId 篩選，呼叫端需自行過濾。
+ * 注意：此環境 YSCP 可能忽略 phone／visitorId 篩選，呼叫端需自行過濾。
  */
 export const getVisitorRegisterRecords = async (params: {
   visitStartTime: string;
@@ -194,9 +197,9 @@ export const getVisitorRegisterRecords = async (params: {
   };
 
   const { data } = await artemisPostSecure<
-    HcpApiResult<VisitorRegisterRecordListData | VisitorRegisterRecord[]>
+    YscpApiResult<VisitorRegisterRecordListData | VisitorRegisterRecord[]>
   >(path, body);
-  const payload = assertSuccess(data, "查詢在廠記錄失敗");
+  const payload = assertYscpOk(data, "查詢在廠記錄失敗");
 
   if (Array.isArray(payload)) {
     return { total: payload.length, list: payload };
@@ -214,15 +217,15 @@ export const getVisitorRegisterRecords = async (params: {
   };
 };
 
-/** 訪客離場簽退，HCP 會撤銷門禁／通道／電梯權限 */
+/** 訪客離場簽退，YSCP 會撤銷門禁／通道／電梯權限 */
 export const visitorCheckOut = async (
   appointRecordId: string,
 ): Promise<void> => {
   const path = "/artemis/api/visitor/v1/visitor/out";
-  const { data } = await artemisPostSecure<HcpApiResult<unknown>>(path, {
+  const { data } = await artemisPostSecure<YscpApiResult<unknown>>(path, {
     appointRecordId,
   });
-  assertSuccess(data, "簽退失敗");
+  assertYscpOk(data, "簽退失敗");
 };
 
 /** 報到：寫入 YSCP 時空的姓／名補 "-"。 */
@@ -240,7 +243,7 @@ export const registerCheckIn = async (body: {
   const plateNo = optionalTrim(info.plateNo);
   const companyName = optionalTrim(info.companyName);
 
-  const { data } = await artemisPostSecure<HcpApiResult<RegisterResult>>(path, {
+  const { data } = await artemisPostSecure<YscpApiResult<RegisterResult>>(path, {
     appointId: body.appointId,
     visitorId: body.visitorId,
     visitStartTime: body.visitStartTime,
@@ -250,7 +253,7 @@ export const registerCheckIn = async (body: {
       {
         VisitorInfo: {
           visitorId: body.visitorId,
-          ...toHcpVisitorNames(info),
+          ...toYscpVisitorNames(info),
           gender: info.gender ?? 0,
           ...(phoneNo ? { phoneNo } : {}),
           ...(plateNo ? { plateNo } : {}),
@@ -260,14 +263,14 @@ export const registerCheckIn = async (body: {
     ],
   });
 
-  return assertSuccess(data, "簽到失敗");
+  return assertYscpOk(data, "簽到失敗");
 };
 
 export const reapplyAuth = async (visitorId: string): Promise<void> => {
   const path = "/artemis/api/visitor/v1/auth/reapplication";
-  const { data } = await artemisPostSecure<HcpApiResult<unknown>>(path, {
+  const { data } = await artemisPostSecure<YscpApiResult<unknown>>(path, {
     personIds: visitorId,
     ImmediateDownload: 0,
   });
-  assertSuccess(data, "權限下發失敗");
+  assertYscpOk(data, "權限下發失敗");
 };

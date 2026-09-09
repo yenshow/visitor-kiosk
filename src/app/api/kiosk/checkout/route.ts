@@ -1,4 +1,4 @@
-import { visitorCheckOut } from "@/lib/hcp/visitor-api";
+import { visitorCheckOut } from "@/lib/yscp/visitor-api";
 import { jsonError, jsonOk } from "@/lib/kiosk/api-helpers";
 import {
   clearTempOut,

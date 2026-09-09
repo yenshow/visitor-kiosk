@@ -1,11 +1,11 @@
 import { artemisPostSecure } from "./artemis-client";
 import { getConfig } from "@/lib/config";
-import type { HcpApiResult } from "./visitor-api";
+import { assertYscpOk, type YscpApiResult } from "./visitor-api";
 
 /** 車牌資訊上傳（不論名單皆推送） */
 export const EVENT_TYPE_PLATE_UPLOAD = 131622;
 
-/** 向 HCP 訂閱事件回呼 */
+/** 向 YSCP 訂閱事件回呼 */
 export const subscribeEventByTypes = async (input: {
   eventDest: string;
   token: string;
@@ -13,10 +13,10 @@ export const subscribeEventByTypes = async (input: {
 }): Promise<unknown> => {
   const eventDest = String(input.eventDest ?? "").trim();
   const token = String(input.token ?? "").trim();
-  if (!eventDest) throw new Error("缺少 eventDest（HCP_EVENT_DEST）");
-  if (!token) throw new Error("缺少 token（HCP_EVENT_TOKEN）");
+  if (!eventDest) throw new Error("缺少 eventDest（YSCP_EVENT_DEST）");
+  if (!token) throw new Error("缺少 token（YSCP_EVENT_TOKEN）");
 
-  const { data } = await artemisPostSecure<HcpApiResult<unknown>>(
+  const { data } = await artemisPostSecure<YscpApiResult<unknown>>(
     "/artemis/api/eventService/v1/eventSubscriptionByEventTypes",
     {
       eventTypes: input.eventTypes?.length
@@ -28,10 +28,7 @@ export const subscribeEventByTypes = async (input: {
     },
   );
 
-  if (String(data?.code) !== "0") {
-    throw new Error(data?.msg || "HCP 事件訂閱失敗");
-  }
-  return data.data;
+  return assertYscpOk(data, "YSCP 事件訂閱失敗");
 };
 
 /** 依 .env 訂閱；缺設定時 skipped，不拋錯 */
@@ -41,20 +38,20 @@ export const ensureEventSubscription = async (): Promise<{
   data?: unknown;
   reason?: string;
 }> => {
-  const { hcp } = getConfig();
-  if (!hcp.eventDest || !hcp.eventToken) {
+  const { yscp } = getConfig();
+  if (!yscp.eventDest) {
     return {
       skipped: true,
-      reason: "未設定 HCP_EVENT_DEST / HCP_EVENT_TOKEN",
+      reason: "未設定 YSCP_EVENT_DEST",
     };
   }
-  if (!hcp.accessKey || !hcp.secretKey) {
-    return { skipped: true, reason: "未設定 HCP_AK / HCP_SK" };
+  if (!yscp.accessKey || !yscp.secretKey) {
+    return { skipped: true, reason: "未設定 YSCP_AK / YSCP_SK" };
   }
 
   const data = await subscribeEventByTypes({
-    eventDest: hcp.eventDest,
-    token: hcp.eventToken,
+    eventDest: yscp.eventDest,
+    token: yscp.eventToken,
   });
-  return { skipped: false, eventDest: hcp.eventDest, data };
+  return { skipped: false, eventDest: yscp.eventDest, data };
 };

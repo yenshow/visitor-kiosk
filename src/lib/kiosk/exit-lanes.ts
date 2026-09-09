@@ -3,7 +3,7 @@ export type ExitLane = {
   alarmOutputIndexCode: string;
 };
 
-/** 解析 HCP_EXIT_LANES：[{ "cameraIndexCode": "...", "alarmOutputIndexCode": "..." }] */
+/** 解析 YSCP_EXIT_LANES：[{ "cameraIndexCode": "...", "alarmOutputIndexCode": "..." }] */
 export const parseExitLanes = (raw: string | undefined): ExitLane[] => {
   const text = String(raw ?? "").trim();
   if (!text) return [];
@@ -21,7 +21,7 @@ export const parseExitLanes = (raw: string | undefined): ExitLane[] => {
       return [{ cameraIndexCode, alarmOutputIndexCode }];
     });
   } catch {
-    console.warn("[exit-lanes] HCP_EXIT_LANES JSON 解析失敗");
+    console.warn("[exit-lanes] YSCP_EXIT_LANES JSON 解析失敗");
     return [];
   }
 };

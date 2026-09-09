@@ -1,4 +1,4 @@
-import type { AppointmentItem } from "@/lib/hcp/visitor-api";
+import type { AppointmentItem } from "@/lib/yscp/visitor-api";
 import { normalizePhoneDigits } from "@/lib/kiosk/phone";
 import { normalizePlateNo } from "@/lib/kiosk/plate";
 import { buildPlateCacheIndex } from "@/lib/kiosk/plate-cache";

@@ -18,13 +18,13 @@ export type ArtemisCredentials = {
 export const getArtemisCredentials = (
   config: AppConfig = getConfig(),
 ): ArtemisCredentials => ({
-  hostname: config.hcp.hostname,
-  port: config.hcp.port,
-  baseUrl: config.hcp.baseUrl,
-  accessKey: config.hcp.accessKey,
-  secretKey: config.hcp.secretKey,
-  rejectUnauthorized: config.hcp.rejectUnauthorized,
-  timeoutMs: config.hcp.timeoutMs,
+  hostname: config.yscp.hostname,
+  port: config.yscp.port,
+  baseUrl: config.yscp.baseUrl,
+  accessKey: config.yscp.accessKey,
+  secretKey: config.yscp.secretKey,
+  rejectUnauthorized: config.yscp.rejectUnauthorized,
+  timeoutMs: config.yscp.timeoutMs,
 });
 
 export const buildSignature = (
@@ -41,7 +41,7 @@ export type ArtemisResponse<T = unknown> = {
   data: T;
 };
 
-/** HTTPS POST（內網自簽憑證可設 HCP_REJECT_UNAUTHORIZED=false） */
+/** HTTPS POST（內網自簽憑證不驗證 TLS） */
 export const artemisPostSecure = async <T = unknown>(
   path: string,
   body: Record<string, unknown> = {},

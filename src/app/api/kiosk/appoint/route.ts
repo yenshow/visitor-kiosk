@@ -1,7 +1,7 @@
 import {
   createAppointment,
   getAutomaticApproval,
-} from "@/lib/hcp/visitor-api";
+} from "@/lib/yscp/visitor-api";
 import { jsonError, jsonOk } from "@/lib/kiosk/api-helpers";
 import { normalizePlateNo } from "@/lib/kiosk/plate";
 import { rememberPlate } from "@/lib/kiosk/plate-cache";

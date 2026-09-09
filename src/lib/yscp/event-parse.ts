@@ -20,17 +20,16 @@ const pickString = (...values: unknown[]): string => {
   return "";
 };
 
-/** HCP 可能把 token 放在 header／query／body */
-export const extractHcpEventToken = (
+/** YSCP 可能把 token 放在 header／query／body */
+export const extractYscpEventToken = (
   request: Request,
   body: JsonObject | null,
   url: URL,
 ): string => {
-  // Fetch headers 大小寫不敏感
   const headerToken =
     request.headers.get("token") ||
     request.headers.get("x-token") ||
-    request.headers.get("x-hcp-token");
+    request.headers.get("x-yscp-token");
   if (headerToken?.trim()) return headerToken.trim();
 
   const queryToken = url.searchParams.get("token");

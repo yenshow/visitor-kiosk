@@ -1,4 +1,4 @@
-import { searchHosts } from "@/lib/hcp/org-api";
+import { searchHosts } from "@/lib/yscp/org-api";
 import { jsonError, jsonOk } from "@/lib/kiosk/api-helpers";
 
 export const POST = async (request: Request) => {

@@ -1,4 +1,4 @@
-import { reapplyAuth, registerCheckIn } from "@/lib/hcp/visitor-api";
+import { reapplyAuth, registerCheckIn } from "@/lib/yscp/visitor-api";
 import { jsonError, jsonOk, toTaipeiIso } from "@/lib/kiosk/api-helpers";
 import { normalizePlateNo } from "@/lib/kiosk/plate";
 import {

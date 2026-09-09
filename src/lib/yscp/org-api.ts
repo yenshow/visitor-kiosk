@@ -1,10 +1,5 @@
 import { artemisPostSecure } from "./artemis-client";
-
-export type HcpApiResult<T> = {
-  code: string;
-  msg: string;
-  data: T;
-};
+import { assertYscpOk, type YscpApiResult } from "./visitor-api";
 
 export type OrgNode = {
   orgIndexCode: string;
@@ -24,13 +19,6 @@ export type OrgOption = {
   parentOrgIndexCode: string;
   /** 含上層路徑，例如「遠岫科技 / 業務部」 */
   label: string;
-};
-
-const assertSuccess = <T>(result: HcpApiResult<T>, fallbackMsg: string): T => {
-  if (String(result?.code) !== "0") {
-    throw new Error(result?.msg || fallbackMsg);
-  }
-  return result.data;
 };
 
 const toOrg = (raw: {
@@ -69,11 +57,11 @@ export const listAllOrgs = async (): Promise<OrgNode[]> => {
   const all: OrgNode[] = [];
 
   while (all.length < total) {
-    const { data } = await artemisPostSecure<HcpApiResult<OrgListPayload>>(
+    const { data } = await artemisPostSecure<YscpApiResult<OrgListPayload>>(
       path,
       { pageNo, pageSize },
     );
-    const payload = assertSuccess(data, "取得部門清單失敗");
+    const payload = assertYscpOk(data, "取得部門清單失敗");
     total = Number(payload?.total ?? 0);
     const page = (payload?.list ?? [])
       .map((item) => toOrg(item))
@@ -176,7 +164,7 @@ const toHost = (p: PersonListItem): HostPerson | null => {
 
 /**
  * 進階搜尋受訪人。
- * 注意：部分 HCP 版本會忽略 orgIndexCode，需在本端依組織範圍再過濾。
+ * 注意：部分 YSCP 版本會忽略 orgIndexCode，需在本端依組織範圍再過濾。
  */
 export const searchHosts = async (params: {
   personName?: string;
@@ -200,18 +188,18 @@ export const searchHosts = async (params: {
     if (personName) body.personName = personName;
     if (orgIndexCode) {
       body.orgIndexCode = orgIndexCode;
-      /** 部分 HCP／iSecure 版本支援：含子孫部門 */
+      /** 部分 YSCP／iSecure 版本支援：含子孫部門 */
       body.isSubOrg = true;
     }
 
     const { data } = await artemisPostSecure<
-      HcpApiResult<{
+      YscpApiResult<{
         total?: number;
         list?: PersonListItem[];
       }>
     >(path, body);
 
-    const payload = assertSuccess(data, "查詢被訪人失敗");
+    const payload = assertYscpOk(data, "查詢被訪人失敗");
     total = Number(payload?.total ?? 0);
     const page = (payload?.list ?? [])
       .map((item) => toHost(item))

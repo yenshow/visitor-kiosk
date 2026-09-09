@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start --port 3010",
     "lint": "eslint",
-    "setup:hcp": "tsx scripts/hcp-setup.ts"
+    "setup:yscp": "tsx scripts/yscp-setup.ts"
   },
   "dependencies": {
     "next": "16.3.4",

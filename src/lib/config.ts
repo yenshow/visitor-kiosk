@@ -3,21 +3,18 @@ import {
   type ExitLane,
 } from "@/lib/kiosk/exit-lanes";
 
-const toBoolean = (raw: string | undefined, fallback: boolean): boolean => {
-  if (raw === undefined || raw === "") return fallback;
-  return ["1", "true", "yes", "on"].includes(String(raw).trim().toLowerCase());
-};
+export const YSCP_HTTPS_PORT = 443;
+export const YSCP_TIMEOUT_MS = 30_000;
+export const YSCP_GATE_DEDUP_MS = 5_000;
+export const YSCP_REJECT_UNAUTHORIZED = false;
+export const YSCP_EVENT_TOKEN_DEFAULT = "Aa83124007";
+export const KIOSK_LISTEN_PORT = 3010;
+export const YSCP_EVENT_WEBHOOK_PATH = "/api/yscp/events";
 
-const toPositiveInt = (
-  raw: string | undefined,
-  fallback: number,
-): number => {
-  const n = Number(raw);
-  return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
-};
+const env = (key: string): string => String(process.env[key] ?? "").trim();
 
 /** 允許 `192.168.2.2` 或 `192.168.2.2:443` */
-export const parseHcpHost = (
+const parseYscpHost = (
   raw: string,
 ): { hostname: string; port?: number } => {
   const cleaned = String(raw ?? "")
@@ -31,12 +28,12 @@ export const parseHcpHost = (
   const port = portPart ? Number(portPart) : undefined;
   return {
     hostname: hostname || "127.0.0.1",
-    port: Number.isFinite(port) ? port : undefined,
+    port: Number.isFinite(port) && port && port > 0 ? port : undefined,
   };
 };
 
 export type AppConfig = {
-  hcp: {
+  yscp: {
     hostname: string;
     port: number;
     baseUrl: string;
@@ -52,26 +49,23 @@ export type AppConfig = {
 };
 
 export const getConfig = (): AppConfig => {
-  const parsed = parseHcpHost(process.env.HCP_HOST || "127.0.0.1");
-  const port = toPositiveInt(process.env.HCP_PORT, parsed.port ?? 443);
+  const parsed = parseYscpHost(env("YSCP_HOST") || "127.0.0.1");
+  const port = parsed.port ?? YSCP_HTTPS_PORT;
   const hostname = parsed.hostname;
 
   return {
-    hcp: {
+    yscp: {
       hostname,
       port,
       baseUrl: `https://${hostname}${port === 443 ? "" : `:${port}`}`,
-      accessKey: String(process.env.HCP_AK ?? "").trim(),
-      secretKey: String(process.env.HCP_SK ?? "").trim(),
-      rejectUnauthorized: toBoolean(
-        process.env.HCP_REJECT_UNAUTHORIZED,
-        false,
-      ),
-      timeoutMs: toPositiveInt(process.env.HCP_TIMEOUT_MS, 30000),
-      eventDest: String(process.env.HCP_EVENT_DEST ?? "").trim(),
-      eventToken: String(process.env.HCP_EVENT_TOKEN ?? "").trim(),
-      exitLanes: parseExitLanes(process.env.HCP_EXIT_LANES),
-      gateDedupMs: toPositiveInt(process.env.HCP_GATE_DEDUP_MS, 5000),
+      accessKey: env("YSCP_AK"),
+      secretKey: env("YSCP_SK"),
+      rejectUnauthorized: YSCP_REJECT_UNAUTHORIZED,
+      timeoutMs: YSCP_TIMEOUT_MS,
+      eventDest: env("YSCP_EVENT_DEST"),
+      eventToken: env("YSCP_EVENT_TOKEN") || YSCP_EVENT_TOKEN_DEFAULT,
+      exitLanes: parseExitLanes(env("YSCP_EXIT_LANES")),
+      gateDedupMs: YSCP_GATE_DEDUP_MS,
     },
   };
 };

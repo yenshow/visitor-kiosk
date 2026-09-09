@@ -1,6 +1,6 @@
 import { after } from "next/server";
 import { getConfig } from "@/lib/config";
-import { controlAlarmOutput } from "@/lib/hcp/exit-gate";
+import { controlAlarmOutput } from "@/lib/yscp/exit-gate";
 import {
   isExitPlateAllowed,
   tryClaimGateDedup,
@@ -8,17 +8,17 @@ import {
 import { findExitLane } from "@/lib/kiosk/exit-lanes";
 import {
   asJsonObject,
-  extractHcpEventToken,
+  extractYscpEventToken,
   parsePlateEvents,
   type ParsedPlateEvent,
-} from "@/lib/kiosk/hcp-event-parse";
+} from "@/lib/yscp/event-parse";
 
 const processPlateEvent = async (event: ParsedPlateEvent) => {
-  const { hcp } = getConfig();
-  const lane = findExitLane(hcp.exitLanes, event.cameraIndexCode);
+  const { yscp } = getConfig();
+  const lane = findExitLane(yscp.exitLanes, event.cameraIndexCode);
   if (!lane) {
     console.info(
-      `[hcp-events] 略過非出口相機 camera=${event.cameraIndexCode} plate=${event.plateNo}`,
+      `[yscp-events] 略過非出口相機 camera=${event.cameraIndexCode} plate=${event.plateNo}`,
     );
     return;
   }
@@ -26,14 +26,14 @@ const processPlateEvent = async (event: ParsedPlateEvent) => {
   const allow = await isExitPlateAllowed(event.plateNo);
   if (!allow.allowed) {
     console.info(
-      `[hcp-events] 車牌未在出場名單 plate=${event.plateNo} camera=${event.cameraIndexCode}`,
+      `[yscp-events] 車牌未在出場名單 plate=${event.plateNo} camera=${event.cameraIndexCode}`,
     );
     return;
   }
 
   if (!tryClaimGateDedup(event.plateNo, event.cameraIndexCode)) {
     console.info(
-      `[hcp-events] 去重略過 plate=${event.plateNo} camera=${event.cameraIndexCode}`,
+      `[yscp-events] 去重略過 plate=${event.plateNo} camera=${event.cameraIndexCode}`,
     );
     return;
   }
@@ -44,17 +44,17 @@ const processPlateEvent = async (event: ParsedPlateEvent) => {
       action: 1,
     });
     console.info(
-      `[hcp-events] 開閘 reason=${allow.reason} plate=${event.plateNo} relay=${lane.alarmOutputIndexCode}`,
+      `[yscp-events] 開閘 reason=${allow.reason} plate=${event.plateNo} relay=${lane.alarmOutputIndexCode}`,
     );
   } catch (error) {
     console.error(
-      `[hcp-events] 開閘失敗 plate=${event.plateNo}`,
+      `[yscp-events] 開閘失敗 plate=${event.plateNo}`,
       error instanceof Error ? error.message : error,
     );
   }
 };
 
-/** 立刻回 200，背景比對／開閘，避免 HCP 推送逾時 */
+/** 立刻回 200，背景比對／開閘，避免 YSCP 推送逾時 */
 export const POST = async (request: Request) => {
   const url = new URL(request.url);
   let body = null as ReturnType<typeof asJsonObject>;
@@ -64,7 +64,7 @@ export const POST = async (request: Request) => {
     body = null;
   }
 
-  const expected = getConfig().hcp.eventToken;
+  const expected = getConfig().yscp.eventToken;
   if (!expected) {
     return Response.json(
       { code: "1", msg: "event token not configured" },
@@ -72,7 +72,7 @@ export const POST = async (request: Request) => {
     );
   }
 
-  if (extractHcpEventToken(request, body, url) !== expected) {
+  if (extractYscpEventToken(request, body, url) !== expected) {
     return Response.json({ code: "1", msg: "invalid token" }, { status: 401 });
   }
 

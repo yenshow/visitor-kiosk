@@ -1,7 +1,7 @@
 import {
   listAppointments,
   type AppointmentItem,
-} from "@/lib/hcp/visitor-api";
+} from "@/lib/yscp/visitor-api";
 import {
   getAppointQueryRangeTaipei,
   jsonError,

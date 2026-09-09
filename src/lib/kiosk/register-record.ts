@@ -1,4 +1,4 @@
-import type { VisitorRegisterRecord } from "@/lib/hcp/visitor-api";
+import type { VisitorRegisterRecord } from "@/lib/yscp/visitor-api";
 import { normalizePlateNo } from "@/lib/kiosk/plate";
 import { displayVisitorName } from "@/lib/kiosk/visitor-fields";
 

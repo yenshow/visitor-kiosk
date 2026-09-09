@@ -5,12 +5,12 @@ import { jsonOk } from "@/lib/kiosk/api-helpers";
 export const GET = async () => {
   const config = getConfig();
   const hasCredentials = Boolean(
-    config.hcp.accessKey && config.hcp.secretKey,
+    config.yscp.accessKey && config.yscp.secretKey,
   );
 
   return jsonOk({
-    host: config.hcp.hostname,
-    port: config.hcp.port,
+    host: config.yscp.hostname,
+    port: config.yscp.port,
     hasCredentials,
   });
 };

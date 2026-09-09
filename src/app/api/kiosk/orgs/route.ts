@@ -1,4 +1,4 @@
-import { listOrgOptions } from "@/lib/hcp/org-api";
+import { listOrgOptions } from "@/lib/yscp/org-api";
 import { jsonError, jsonOk } from "@/lib/kiosk/api-helpers";
 
 /** GET：扁平部門清單（含路徑標籤，供下拉） */

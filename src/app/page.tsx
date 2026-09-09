@@ -15,6 +15,7 @@ import type { KioskSettingsView } from "@/components/kiosk/SettingsForm";
 import { ThemeSync } from "@/components/kiosk/ThemeSync";
 import {
   DEFAULT_MARQUEE,
+  KIOSK_IDLE_SECONDS,
   type RecordsFilter,
 } from "@/lib/kiosk/ui-constants";
 
@@ -24,12 +25,6 @@ type StatusInfo = {
   hasCredentials: boolean;
 };
 
-const parseIdleSeconds = (): number => {
-  const n = Number(process.env.NEXT_PUBLIC_KIOSK_IDLE_SECONDS || "20");
-  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 20;
-};
-
-const IDLE_SECONDS = parseIdleSeconds();
 const STATS_POLL_MS = 20_000;
 
 const FlowPanel = ({
@@ -134,7 +129,7 @@ export default function HomePage() {
         {screen === "appoint" ? (
           <FlowPanel wide>
             <AppointForm
-              idleSeconds={IDLE_SECONDS}
+              idleSeconds={KIOSK_IDLE_SECONDS}
               onHome={() => setScreen("home")}
             />
           </FlowPanel>
@@ -143,7 +138,7 @@ export default function HomePage() {
         {screen === "checkin" ? (
           <FlowPanel>
             <CheckinFlow
-              idleSeconds={IDLE_SECONDS}
+              idleSeconds={KIOSK_IDLE_SECONDS}
               onHome={() => setScreen("home")}
               onGoAppoint={
                 showAppoint ? () => setScreen("appoint") : undefined
@@ -155,7 +150,7 @@ export default function HomePage() {
         {screen === "checkout" ? (
           <FlowPanel>
             <CheckoutFlow
-              idleSeconds={IDLE_SECONDS}
+              idleSeconds={KIOSK_IDLE_SECONDS}
               onHome={() => setScreen("home")}
             />
           </FlowPanel>
