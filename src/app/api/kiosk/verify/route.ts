@@ -93,6 +93,7 @@ export const POST = async (request: Request) => {
           item.visitReasonDetail,
           item.visitorReasonName,
         ),
+        visitReasonType: Number(item.visitReasonType ?? NaN),
       });
     }
 

@@ -1,5 +1,5 @@
 import { getConfig } from "@/lib/config";
-import { getPresenceStore } from "@/lib/kiosk/presence";
+import { exitCandidates, getVisitStore } from "@/lib/kiosk/presence";
 import { normalizePlateNo } from "@/lib/kiosk/plate";
 
 export type ExitAllowReason = "temp_out" | "departed";
@@ -19,21 +19,12 @@ export const isExitPlateAllowed = async (
   if (!plateNo) return { allowed: false, plateNo: "" };
 
   const windowMs = getConfig().yscp.exitGateMinutes * 60_000;
-  const store = await getPresenceStore();
+  const store = await getVisitStore();
 
-  const lists: { reason: ExitAllowReason; items: { plateNo: string; at: string }[] }[] =
-    [
-      { reason: "temp_out", items: store.tempOut },
-      { reason: "departed", items: store.departed },
-    ];
-
-  for (const { reason, items } of lists) {
-    const hit = items.find(
-      (item) => normalizePlateNo(item.plateNo) === plateNo,
-    );
-    if (hit && isWithinExitWindow(hit.at, windowMs)) {
-      return { allowed: true, reason, plateNo };
-    }
+  for (const item of exitCandidates(store.visits)) {
+    if (normalizePlateNo(item.plateNo) !== plateNo) continue;
+    if (!isWithinExitWindow(item.at, windowMs)) continue;
+    return { allowed: true, reason: item.reason, plateNo };
   }
 
   return { allowed: false, plateNo };

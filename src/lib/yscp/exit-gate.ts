@@ -1,4 +1,5 @@
 import { artemisPostSecure } from "./artemis-client";
+import { YSCP_RELAY_HOLD_MS } from "@/lib/config";
 import { assertYscpOk, type YscpApiResult } from "./visitor-api";
 
 export type YscpCamera = {
@@ -18,7 +19,7 @@ export type YscpAlarmOutput = {
 
 type PageList = { total?: number; list?: Record<string, unknown>[] };
 
-/** action: 1 = 開閘，0 = 關閉 */
+/** action: 1 = 開閘，0 = 關閉（維持致能直到再送 0） */
 export const controlAlarmOutput = async (input: {
   alarmOutputIndexCode: string;
   action?: 0 | 1;
@@ -34,6 +35,45 @@ export const controlAlarmOutput = async (input: {
     },
   );
   return assertYscpOk(data, "道閘控制失敗");
+};
+
+const waitMs = (ms: number) =>
+  new Promise<void>((resolve) => {
+    setTimeout(resolve, ms);
+  });
+
+/** 同一繼電器若連續脈衝，較新的開啟不應被較舊的延時關閉關掉 */
+const pulseSeqByRelay = new Map<string, number>();
+
+/** 開閘後維持 holdMs，再送關閉 */
+export const pulseAlarmOutput = async (input: {
+  alarmOutputIndexCode: string;
+  holdMs?: number;
+}): Promise<{ holdMs: number }> => {
+  const alarmOutputIndexCode = String(input.alarmOutputIndexCode ?? "").trim();
+  if (!alarmOutputIndexCode) throw new Error("缺少 alarmOutputIndexCode");
+
+  const holdMs = Math.max(
+    200,
+    Number.isFinite(input.holdMs) ? Number(input.holdMs) : YSCP_RELAY_HOLD_MS,
+  );
+  const seq = (pulseSeqByRelay.get(alarmOutputIndexCode) ?? 0) + 1;
+  pulseSeqByRelay.set(alarmOutputIndexCode, seq);
+
+  await controlAlarmOutput({ alarmOutputIndexCode, action: 1 });
+  await waitMs(holdMs);
+  if (pulseSeqByRelay.get(alarmOutputIndexCode) !== seq) {
+    return { holdMs };
+  }
+  try {
+    await controlAlarmOutput({ alarmOutputIndexCode, action: 0 });
+  } catch (error) {
+    console.error(
+      `[exit-gate] 繼電器關閉失敗 relay=${alarmOutputIndexCode}`,
+      error instanceof Error ? error.message : error,
+    );
+  }
+  return { holdMs };
 };
 
 /** 分頁查詢全部攝影機通道 */

@@ -272,7 +272,7 @@ export const SettingsForm = ({ initial, onSaved }: SettingsFormProps) => {
       <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
         <h3 className="text-lg font-semibold text-amber-950">重置訪客統計</h3>
         <p className="mt-2 text-base text-amber-900">
-          清空本機臨時外出、已離場與在場快取。不影響 YSCP 在廠狀態。
+          清除所有離場累計，並取消本機臨時外出標記；保留在場訪客完整資料。不影響 YSCP 在廠狀態。
         </p>
         {resetConfirm ? (
           <div className="mt-4 flex flex-wrap gap-2">

@@ -1,7 +1,7 @@
 import { jsonError, jsonOk } from "@/lib/kiosk/api-helpers";
 import { listVisitorRecords } from "@/lib/kiosk/records";
 
-/** GET：在場中／臨時外出／已離場明細 */
+/** GET：目前在場／臨時外出／今日離場／所有離場明細 */
 export const GET = async () => {
   try {
     const data = await listVisitorRecords();

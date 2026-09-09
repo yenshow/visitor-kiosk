@@ -4,7 +4,10 @@ import type { RecordsFilter } from "@/lib/kiosk/ui-constants";
 export type KioskStatsView = {
   onSite: number;
   tempOut: number;
+  /** 今日離場 */
   departed: number;
+  /** 所有離場累計 */
+  departedTotal?: number;
 };
 
 type HomeActionCardsProps = {
@@ -80,7 +83,7 @@ export const HomeActionCards = ({
         aria-label="訪客統計"
       >
         <StatCell
-          label="在場中"
+          label="目前在場"
           value={stats.onSite}
           onClick={() => onOpenRecords("on_site")}
         />
@@ -90,9 +93,9 @@ export const HomeActionCards = ({
           onClick={() => onOpenRecords("temp_out")}
         />
         <StatCell
-          label="已離場"
+          label="今日離場"
           value={stats.departed}
-          onClick={() => onOpenRecords("departed")}
+          onClick={() => onOpenRecords("departed_today")}
         />
       </div>
     ) : null}

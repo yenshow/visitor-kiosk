@@ -1,6 +1,6 @@
-import { upsertVisitorMeta } from "@/lib/kiosk/presence";
+import { upsertVisitOnCheckin } from "@/lib/kiosk/presence";
 
-/** 報到成功後統一寫入本機訪客資料（僅 visitorMeta，單一 JSON） */
+/** 報到成功後寫入本機訪客主檔（visits，status=on_site） */
 export const recordVisitorAfterCheckin = async (entry: {
   recordId: string;
   visitorId?: string;
@@ -9,11 +9,12 @@ export const recordVisitorAfterCheckin = async (entry: {
   plateNo?: string;
   companyName?: string;
   receptionistName?: string;
+  visitReasonType?: number;
 }): Promise<void> => {
   const recordId = String(entry.recordId ?? "").trim();
   if (!recordId) return;
 
-  await upsertVisitorMeta({
+  await upsertVisitOnCheckin({
     recordId,
     visitorId: entry.visitorId,
     visitorName: entry.visitorName,
@@ -21,5 +22,6 @@ export const recordVisitorAfterCheckin = async (entry: {
     plateNo: entry.plateNo,
     companyName: entry.companyName,
     receptionistName: entry.receptionistName,
+    visitReasonType: entry.visitReasonType,
   });
 };

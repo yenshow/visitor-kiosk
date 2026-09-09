@@ -1,7 +1,7 @@
 import type { AppointmentItem } from "@/lib/yscp/visitor-api";
 import { normalizePhoneDigits } from "@/lib/kiosk/phone";
 import { normalizePlateNo } from "@/lib/kiosk/plate";
-import type { VisitorMetaEntry } from "@/lib/kiosk/presence";
+import type { VisitorVisit } from "@/lib/kiosk/presence";
 import type { FlatRegisterRecord } from "@/lib/kiosk/register-record";
 import { displayVisitorName } from "@/lib/kiosk/visitor-fields";
 
@@ -70,18 +70,18 @@ export const findAppointEnrichment = (
   return null;
 };
 
-/** meta（報到後本機紀錄）> 在廠紀錄 > 預約補齊 */
+/** visit 完整欄位 > 在廠紀錄 > 預約補齊 */
 export const mergeRegisterFields = (
   flat: FlatRegisterRecord,
   options?: {
     enrich?: AppointEnrichment | null;
-    meta?: VisitorMetaEntry | null;
+    visit?: VisitorVisit | null;
   },
 ): FlatRegisterRecord => {
   const enrich = options?.enrich;
-  const meta = options?.meta;
-  const metaName =
-    meta?.visitorName && meta.visitorName !== "—" ? meta.visitorName : "";
+  const visit = options?.visit;
+  const visitName =
+    visit?.visitorName && visit.visitorName !== "—" ? visit.visitorName : "";
   const enrichName =
     enrich?.visitorName && enrich.visitorName !== "—"
       ? enrich.visitorName
@@ -89,24 +89,24 @@ export const mergeRegisterFields = (
 
   return {
     ...flat,
-    visitorName: metaName || enrichName || flat.visitorName,
+    visitorName: visitName || enrichName || flat.visitorName,
     phoneNo:
-      normalizePhoneDigits(meta?.phoneNo ?? "") ||
+      normalizePhoneDigits(visit?.phoneNo ?? "") ||
       normalizePhoneDigits(flat.phoneNo) ||
       normalizePhoneDigits(enrich?.phoneNo ?? "") ||
       "",
     plateNo:
-      normalizePlateNo(meta?.plateNo) ||
+      normalizePlateNo(visit?.plateNo) ||
       flat.plateNo ||
       normalizePlateNo(enrich?.plateNo) ||
       "",
     companyName:
-      String(meta?.companyName ?? "").trim() ||
+      String(visit?.companyName ?? "").trim() ||
       flat.companyName ||
       String(enrich?.companyName ?? "").trim() ||
       "",
     receptionistName:
-      String(meta?.receptionistName ?? "").trim() ||
+      String(visit?.receptionistName ?? "").trim() ||
       flat.receptionistName ||
       String(enrich?.receptionistName ?? "").trim() ||
       "",
@@ -115,19 +115,19 @@ export const mergeRegisterFields = (
   };
 };
 
-/** 在廠清單補齊：優先用報到後 visitorMeta */
-export const enrichRegisterList = async (
+/** 在廠清單補齊：優先用本機 visit */
+export const enrichRegisterList = (
   list: FlatRegisterRecord[],
   appointments: AppointmentItem[] | undefined,
-  visitorMeta: VisitorMetaEntry[],
-): Promise<FlatRegisterRecord[]> => {
+  visits: VisitorVisit[],
+): FlatRegisterRecord[] => {
   const index = buildAppointEnrichmentIndex(appointments ?? []);
-  const metaById = new Map(visitorMeta.map((item) => [item.recordId, item]));
+  const visitById = new Map(visits.map((item) => [item.recordId, item]));
 
   return list.map((flat) =>
     mergeRegisterFields(flat, {
       enrich: findAppointEnrichment(index, flat),
-      meta: metaById.get(flat.recordId),
+      visit: visitById.get(flat.recordId),
     }),
   );
 };

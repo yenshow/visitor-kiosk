@@ -15,12 +15,12 @@
 
 - 金鑰與簽章只在後端（`YSCP_AK` / `YSCP_SK`）。時區 `Asia/Taipei`。
 - 報到／簽退下一步用一次性 token（記憶體、10 分鐘）；前端不帶 `appointID`。
-- 本機：`data/kiosk-presence.json`（臨時外出、已離場累積、報到快取；開閘比對另受 15 分鐘時限）、`data/kiosk-settings.json`、`data/kiosk-logo.*`。設定頁 `/setting`。
+- 本機：`data/kiosk-presence.json`（單一 `visits[]`：一筆訪客一個 status；開閘比對另受 15 分鐘時限）、`data/kiosk-settings.json`、`data/kiosk-logo.*`。設定頁 `/setting`。
 - 無操作 20 秒回首頁。
 
 ## 2. 業務流程
 
-首頁：**訪客報到**、**訪客簽退**、可關閉的**訪客預約**；統計「在場中／臨時外出／已離場」點擊開啟訪客紀錄。預約可來自 YSCP Web 或現場 Kiosk；現場送出後不顯示密碼，待內部確認。
+首頁：**訪客報到**、**訪客簽退**、可關閉的**訪客預約**；統計「目前在場／臨時外出／今日離場」點擊開啟訪客紀錄（另可篩「全部／所有離場」）。預約可來自 YSCP Web 或現場 Kiosk；現場送出後不顯示密碼，待內部確認。
 
 ### 2.1 預約
 
@@ -36,26 +36,28 @@
 
 | 模式 | 行為 |
 |------|------|
-| `temp` | 只寫本機 `TEMP_OUT`（含 `at`）。不呼叫 `visitor/out`、按鈕當下不開閘。入口時段仍由 YSCP 管。返回走報到。成功畫面提示並倒數離場時限。 |
-| `return` | 報到畫面呼叫，清 `TEMP_OUT`。YSCP 不異動。 |
-| `final`（預設） | `visitor/out`、清 `TEMP_OUT`、寫入累積 `departed`（含姓名／手機／車牌／公司／被訪人）。按鈕當下不開閘。成功畫面提示並倒數離場時限。 |
+| `temp` | 本機 visit → `temp_out`（寫 `tempOutAt`，保留完整欄位）。不呼叫 `visitor/out`、按鈕當下不開閘。入口時段仍由 YSCP 管。返回走報到。成功畫面提示 N 分鐘內離場（無倒數）。 |
+| `return` | 報到畫面呼叫，visit → `on_site`（清 `tempOutAt`）。YSCP 不異動。 |
+| `final`（預設） | `visitor/out`、visit → `departed`（寫 `departedAt`，保留完整欄位）。按鈕當下不開閘。成功畫面提示 N 分鐘內離場（無倒數）。 |
 
-開閘：出口 LPR → YSCP 推 131622 → `/api/yscp/events` 比對 `TEMP_OUT` 或 `departed` 車牌，且登記時間 `at` 起算在 `YSCP_EXIT_GATE_MINUTES`（預設 15）內 → `alarmOutput/controlling`。不分是否當日；逾時不開閘，已離場紀錄仍保留。
+開閘：出口 LPR → YSCP 推 131622 → `/api/yscp/events` 比對 `temp_out`／`departed` 車牌，且 `tempOutAt`／`departedAt` 起算在 `YSCP_EXIT_GATE_MINUTES`（預設 15）內 → `alarmOutput/controlling`。不分是否當日；逾時不開閘，已離場紀錄仍保留至重置。
 
 ### 2.4 人員狀態
 
 | 狀態 | 來源 |
 |------|------|
 | 待報到 | YSCP `appointStatus = 0`（首頁統計不顯示） |
-| ON_SITE（在場中） | YSCP 在廠、來訪結束時間未過、且不在本機外出清單 |
-| TEMP_OUT（臨時外出） | YSCP 仍在廠、來訪結束時間未過，本機已記臨時外出 |
-| CHECKED_OUT（已離場） | 已 `visitor/out`，本機累積離場列（跨日保留至重置） |
+| on_site（目前在場） | YSCP 在廠、來訪結束時間未過、本機 visit 非 temp_out／departed（或僅 YSCP 在廠無本機列） |
+| temp_out（臨時外出） | YSCP 仍在廠、來訪結束時間未過，本機 `status=temp_out` |
+| departed（已離場） | 正式簽退後本機累積；**首頁「今日離場」**僅計 `departedAt` 為台北今日；「所有離場／全部」含跨日 |
 
 車牌僅顯示；不另計場內車／外出車。
 
 ### 2.5 本機設定與紀錄
 
-`/setting` 無需登入：跑馬燈（空則寫死預設文案）、主題 `light`｜`dark`（cookie + `public/theme-init.js`）、logo（無則 `public/yenshow-logo.svg`）、`showAppoint`、**重置訪客統計**（清空本機 `tempOut`／`departed`／`visitorMeta`；不批次 YSCP 簽退）。訪客紀錄：統計摘要＋明細（姓名／手機／車牌／公司／被訪人／時間，不顯示 email），可篩選／搜尋／分頁；不匯出。
+`/setting` 無需登入：跑馬燈（空則寫死預設文案）、主題 `light`｜`dark`（cookie + `public/theme-init.js`）、logo（無則 `public/yenshow-logo.svg`）、`showAppoint`、**重置訪客統計**（刪全部 departed；temp_out→on_site；**保留** on_site 欄位；不批次 YSCP 簽退）。訪客紀錄：統計摘要＋明細（姓名／手機／車牌／公司／被訪人／時間），可篩全部／目前在場／臨時外出／今日離場／所有離場；不匯出。
+
+本機主檔形狀：`{ visits: VisitorVisit[] }`（舊三陣列格式讀取時自動遷移）。
 
 ## 3. Kiosk API
 
@@ -64,9 +66,9 @@
 | 方法 | 路徑 | 用途 |
 |------|------|------|
 | GET | `/api/kiosk/status` | 是否已設定 YSCP 金鑰 |
-| GET | `/api/kiosk/stats` | 在場中／臨時外出／已離場 `{ onSite, tempOut, departed }` |
-| GET | `/api/kiosk/records` | 訪客紀錄 `{ summary, rows }` |
-| POST | `/api/kiosk/records/reset` | 清空本機 tempOut／departed／visitorMeta |
+| GET | `/api/kiosk/stats` | `{ onSite, tempOut, departed, departedTotal }`（departed＝今日離場） |
+| GET | `/api/kiosk/records` | 訪客紀錄 `{ summary, rows }`（含跨日離場；row 可含 `isDepartedToday`） |
+| POST | `/api/kiosk/records/reset` | 清 departed、取消 temp_out；保留 on_site |
 | GET / PUT | `/api/kiosk/settings` | 跑馬燈、主題、預約開關；Set-Cookie `theme` |
 | GET / POST | `/api/kiosk/settings/logo` | 讀取／上傳／`reset=1`（≤2MB） |
 | GET | `/api/kiosk/notice` | 訪客須知 Markdown |
@@ -84,7 +86,7 @@
 
 **verify** `query`：8–15 位數字視為手機，否則為預約號碼／密碼（`appointCode`）。查詢時段為前 30 日～後 30 日；精準查無結果時會加寬清單後端比對（含 `appointID` 尾碼），避免提早／跨日預約漏查。
 
-**stats**：YSCP 在廠且 `visitEndTime`（缺則用預約 `appointEndTime`）尚未結束 − TEMP_OUT = `onSite`；TEMP_OUT ∩ 未結束在廠 = `tempOut`；`departed` 為本機累積正式簽退筆數（不隔日清空）。車牌／手機等以報到後 `visitorMeta` 與離場紀錄補齊（YSCP 列表常缺欄位）。
+**stats**：YSCP 在廠且 `visitEndTime`（缺則用預約 `appointEndTime`）尚未結束 − temp_out = `onSite`；temp_out ∩ 未結束在廠 = `tempOut`；`departed`＝本機 `departedAt` 為台北今日之筆數；`departedTotal`＝全部 departed。欄位以本機 `visits` 為準補齊。
 
 ## 4. YSCP Artemis
 

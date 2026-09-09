@@ -7,6 +7,8 @@ export const VISIT_REASON_OPTIONS = [
   { value: 4, label: "施工" },
 ] as const;
 
+export const VISIT_REASON_CONSTRUCTION = 4;
+
 const LABEL_BY_TYPE: Record<number, string> = Object.fromEntries(
   VISIT_REASON_OPTIONS.map((o) => [o.value, o.label]),
 );
@@ -23,4 +25,14 @@ export const visitReasonLabel = (
     String(detail ?? "").trim() ||
     "—"
   );
+};
+
+/** 僅施工事由需播放訪客須知影片 */
+export const isConstructionVisit = (
+  type?: number | string | null,
+  label?: string | null,
+): boolean => {
+  const n = Number(type);
+  if (Number.isFinite(n) && n === VISIT_REASON_CONSTRUCTION) return true;
+  return String(label ?? "").trim() === "施工";
 };

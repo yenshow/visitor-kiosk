@@ -10,6 +10,7 @@ import {
   toTaipeiDateKey,
 } from "@/lib/kiosk/api-helpers";
 import { formatDateTimeRange } from "@/lib/kiosk/format";
+import { isConstructionVisit } from "@/lib/kiosk/visit-reason";
 import {
   postCheckoutModes,
   toggleSelectedToken,
@@ -26,6 +27,7 @@ type AppointmentView = {
   companyName: string;
   plateNo?: string;
   visitReason?: string;
+  visitReasonType?: number;
 };
 
 type CheckinFlowProps = {
@@ -290,6 +292,9 @@ export const CheckinFlow = ({
           <VisitorNoticeDialog
             confirmLabel="同意並確認返回"
             loading={acting}
+            showVideo={selectedTempOut.some((item) =>
+              isConstructionVisit(item.visitReasonType, item.visitReason),
+            )}
             onCancel={() => setNoticeOpen(false)}
             onConfirm={() => void handleReturn()}
           />
@@ -440,6 +445,10 @@ export const CheckinFlow = ({
         <VisitorNoticeDialog
           confirmLabel="同意並報到"
           loading={acting}
+          showVideo={isConstructionVisit(
+            selected?.visitReasonType,
+            selected?.visitReason,
+          )}
           onCancel={() => setNoticeOpen(false)}
           onConfirm={() => void handleCheckin()}
         />

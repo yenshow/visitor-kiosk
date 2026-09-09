@@ -54,7 +54,14 @@ export const POST = async (request: Request) => {
     const messages = buildMessages(exitGateMinutes);
 
     if (mode === "temp") {
-      await markTempOut({ recordId: appointRecordId, visitorName, plateNo });
+      await markTempOut({
+        recordId: appointRecordId,
+        visitorName,
+        plateNo,
+        phoneNo,
+        companyName,
+        receptionistName,
+      });
     } else if (mode === "return") {
       await clearTempOut(appointRecordId);
     } else {

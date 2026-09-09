@@ -267,9 +267,6 @@ export const AppointForm = ({ idleSeconds, onHome }: AppointFormProps) => {
             })}
           </div>
         </div>
-        <p className="sm:col-span-2 text-base text-slate-600" role="status">
-          來訪日：{todayLabel()}（現場預約僅限當日，不可跨日）
-        </p>
         <label className="block">
           <span className="mb-1 block text-sm font-medium text-slate-600">
             開始時間

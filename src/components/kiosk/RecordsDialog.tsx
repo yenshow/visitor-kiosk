@@ -14,6 +14,7 @@ type VisitorRecordRow = {
   companyName: string;
   receptionistName: string;
   at: string;
+  isDepartedToday?: boolean;
 };
 
 type RecordsDialogProps = {
@@ -25,17 +26,32 @@ type RecordsDialogProps = {
 const PAGE_SIZE = 10;
 
 const PRESENCE_LABEL: Record<VisitorRecordRow["presence"], string> = {
-  on_site: "在場中",
+  on_site: "目前在場",
   temp_out: "臨時外出",
   departed: "已離場",
 };
 
 const FILTER_OPTIONS: { value: RecordsFilter; label: string }[] = [
   { value: "all", label: "全部" },
-  { value: "on_site", label: "在場中" },
+  { value: "on_site", label: "目前在場" },
   { value: "temp_out", label: "臨時外出" },
-  { value: "departed", label: "已離場" },
+  { value: "departed_today", label: "今日離場" },
+  { value: "departed", label: "所有離場" },
 ];
+
+const matchesFilter = (
+  row: VisitorRecordRow,
+  filter: RecordsFilter,
+): boolean => {
+  if (filter === "all") return true;
+  if (filter === "on_site") return row.presence === "on_site";
+  if (filter === "temp_out") return row.presence === "temp_out";
+  if (filter === "departed_today") {
+    return row.presence === "departed" && Boolean(row.isDepartedToday);
+  }
+  if (filter === "departed") return row.presence === "departed";
+  return true;
+};
 
 export const RecordsDialog = ({
   open,
@@ -51,7 +67,8 @@ export const RecordsDialog = ({
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const filterSearchKey = `${filter}\0${search}`;
-  const [trackedFilterSearch, setTrackedFilterSearch] = useState(filterSearchKey);
+  const [trackedFilterSearch, setTrackedFilterSearch] =
+    useState(filterSearchKey);
 
   if (filterSearchKey !== trackedFilterSearch) {
     setTrackedFilterSearch(filterSearchKey);
@@ -59,6 +76,12 @@ export const RecordsDialog = ({
   }
 
   useEffect(() => {
+    if (!open) return;
+    setFilter(initialFilter);
+  }, [open, initialFilter]);
+
+  useEffect(() => {
+    if (!open) return;
     let cancelled = false;
     const load = async () => {
       setLoading(true);
@@ -87,12 +110,12 @@ export const RecordsDialog = ({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [open]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return rows.filter((row) => {
-      if (filter !== "all" && row.presence !== filter) return false;
+      if (!matchesFilter(row, filter)) return false;
       if (!q) return true;
       return (
         row.visitorName.toLowerCase().includes(q) ||
@@ -157,13 +180,16 @@ export const RecordsDialog = ({
                   <thead className="bg-slate-100 text-slate-700">
                     <tr>
                       <th className="border border-slate-200 px-3 py-2">
-                        在場中
+                        目前在場
                       </th>
                       <th className="border border-slate-200 px-3 py-2">
                         臨時外出
                       </th>
                       <th className="border border-slate-200 px-3 py-2">
-                        已離場
+                        今日離場
+                      </th>
+                      <th className="border border-slate-200 px-3 py-2">
+                        所有離場
                       </th>
                     </tr>
                   </thead>
@@ -177,6 +203,9 @@ export const RecordsDialog = ({
                       </td>
                       <td className="border border-slate-200 px-3 py-2 tabular-nums">
                         {summary.departed}
+                      </td>
+                      <td className="border border-slate-200 px-3 py-2 tabular-nums">
+                        {summary.departedTotal ?? summary.departed}
                       </td>
                     </tr>
                   </tbody>
@@ -266,9 +295,11 @@ export const RecordsDialog = ({
                   </thead>
                   <tbody>
                     {pageRows.map((row) => (
-                      <tr key={row.recordId} className="border-b border-slate-100">
+                      <tr key={`${row.presence}-${row.recordId}`} className="border-b border-slate-100">
                         <td className="border border-slate-200 px-3 py-2">
-                          {PRESENCE_LABEL[row.presence]}
+                          {row.presence === "departed" && row.isDepartedToday
+                            ? "今日離場"
+                            : PRESENCE_LABEL[row.presence]}
                         </td>
                         <td className="border border-slate-200 px-3 py-2">
                           {row.visitorName || "—"}

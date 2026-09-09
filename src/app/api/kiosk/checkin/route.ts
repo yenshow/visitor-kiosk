@@ -72,6 +72,9 @@ export const POST = async (request: Request) => {
       plateNo,
       companyName: String(info?.companyName ?? "").trim(),
       receptionistName: String(item.receptionistName ?? "").trim(),
+      visitReasonType: Number.isFinite(visitPurposeType)
+        ? visitPurposeType
+        : undefined,
     });
 
     void reapplyAuth(visitorId).catch(() => undefined);

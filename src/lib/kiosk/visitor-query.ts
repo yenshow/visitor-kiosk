@@ -12,6 +12,8 @@ export type OnSiteRecordView = {
   presence: OnSitePresence;
   /** 臨時外出登記時間（ISO）；跨日返回需再同意須知 */
   tempOutAt?: string;
+  visitReasonType?: number;
+  visitReason?: string;
   visitStartTime: string;
   visitEndTime: string;
   visitingTime?: string;

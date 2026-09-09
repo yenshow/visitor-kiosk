@@ -4,6 +4,8 @@ import {
   type KioskStats,
 } from "@/lib/kiosk/stats";
 import { displayVisitorName } from "@/lib/kiosk/visitor-fields";
+import type { FlatRegisterRecord } from "@/lib/kiosk/register-record";
+import type { VisitorVisit } from "@/lib/kiosk/presence";
 
 export type RecordPresence = "on_site" | "temp_out" | "departed";
 
@@ -15,8 +17,10 @@ export type VisitorRecordRow = {
   plateNo: string;
   companyName: string;
   receptionistName: string;
-  /** 顯示用時間：在場／外出＝報到；離場＝簽退時間 */
+  /** 顯示用時間：在場＝報到；外出＝外出時間；離場＝簽退時間 */
   at: string;
+  /** 僅 departed：是否為台北今日離場 */
+  isDepartedToday?: boolean;
 };
 
 export type VisitorRecordsPayload = {
@@ -24,62 +28,68 @@ export type VisitorRecordsPayload = {
   rows: VisitorRecordRow[];
 };
 
+const toRow = (
+  presence: RecordPresence,
+  fields: {
+    recordId: string;
+    visitorName: string;
+    phoneNo: string;
+    plateNo: string;
+    companyName: string;
+    receptionistName: string;
+  },
+  at: string,
+  isDepartedToday?: boolean,
+): VisitorRecordRow => ({
+  recordId: fields.recordId,
+  presence,
+  visitorName: displayVisitorName(undefined, undefined, fields.visitorName),
+  phoneNo: fields.phoneNo,
+  plateNo: fields.plateNo,
+  companyName: fields.companyName,
+  receptionistName: fields.receptionistName,
+  at,
+  isDepartedToday,
+});
+
+const activeAt = (
+  visit: VisitorVisit | undefined,
+  item: FlatRegisterRecord,
+  preferTempOut: boolean,
+): string => {
+  if (preferTempOut && visit?.tempOutAt) return visit.tempOutAt;
+  return visit?.checkinAt || item.registerTime || item.visitStartTime || "";
+};
+
 export const listVisitorRecords =
   async (): Promise<VisitorRecordsPayload> => {
     const snap = await loadPresenceSnapshot();
-    const rows: VisitorRecordRow[] = [];
+    const todayIds = new Set(snap.departedToday.map((item) => item.recordId));
 
-    for (const item of snap.onSitePeople) {
-      rows.push({
-        recordId: item.recordId,
-        presence: "on_site",
-        visitorName: displayVisitorName(
-          undefined,
-          undefined,
-          item.visitorName,
+    const rows: VisitorRecordRow[] = [
+      ...snap.onSitePeople.map((item) =>
+        toRow(
+          "on_site",
+          item,
+          activeAt(snap.visitsById.get(item.recordId), item, false),
         ),
-        phoneNo: item.phoneNo,
-        plateNo: item.plateNo,
-        companyName: item.companyName,
-        receptionistName: item.receptionistName,
-        at: item.registerTime || item.visitStartTime,
-      });
-    }
-
-    for (const item of snap.tempOutPeople) {
-      const temp = snap.tempOutById.get(item.recordId);
-      rows.push({
-        recordId: item.recordId,
-        presence: "temp_out",
-        visitorName: displayVisitorName(
-          undefined,
-          undefined,
-          item.visitorName,
+      ),
+      ...snap.tempOutPeople.map((item) =>
+        toRow(
+          "temp_out",
+          item,
+          activeAt(snap.visitsById.get(item.recordId), item, true),
         ),
-        phoneNo: item.phoneNo,
-        plateNo: item.plateNo || temp?.plateNo || "",
-        companyName: item.companyName,
-        receptionistName: item.receptionistName,
-        at: temp?.at || item.registerTime || item.visitStartTime,
-      });
-    }
-
-    for (const item of snap.departed) {
-      rows.push({
-        recordId: `departed-${item.recordId}`,
-        presence: "departed",
-        visitorName: displayVisitorName(
-          undefined,
-          undefined,
-          item.visitorName,
+      ),
+      ...snap.departedAll.map((item) =>
+        toRow(
+          "departed",
+          item,
+          item.departedAt || item.checkinAt,
+          todayIds.has(item.recordId),
         ),
-        phoneNo: item.phoneNo,
-        plateNo: item.plateNo,
-        companyName: item.companyName,
-        receptionistName: item.receptionistName,
-        at: item.at,
-      });
-    }
+      ),
+    ];
 
     rows.sort((a, b) => b.at.localeCompare(a.at));
 

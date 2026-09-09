@@ -1,6 +1,6 @@
 import { after } from "next/server";
 import { getConfig } from "@/lib/config";
-import { controlAlarmOutput } from "@/lib/yscp/exit-gate";
+import { pulseAlarmOutput } from "@/lib/yscp/exit-gate";
 import {
   isExitPlateAllowed,
   tryClaimGateDedup,
@@ -10,6 +10,7 @@ import {
   asJsonObject,
   extractYscpEventToken,
   parsePlateEvents,
+  summarizeYscpEventBody,
   type ParsedPlateEvent,
 } from "@/lib/yscp/event-parse";
 
@@ -39,12 +40,11 @@ const processPlateEvent = async (event: ParsedPlateEvent) => {
   }
 
   try {
-    await controlAlarmOutput({
+    const { holdMs } = await pulseAlarmOutput({
       alarmOutputIndexCode: lane.alarmOutputIndexCode,
-      action: 1,
     });
     console.info(
-      `[yscp-events] 開閘 reason=${allow.reason} plate=${event.plateNo} relay=${lane.alarmOutputIndexCode}`,
+      `[yscp-events] 開閘 reason=${allow.reason} plate=${event.plateNo} relay=${lane.alarmOutputIndexCode} hold=${holdMs}ms`,
     );
   } catch (error) {
     console.error(
@@ -77,6 +77,17 @@ export const POST = async (request: Request) => {
   }
 
   const events = parsePlateEvents(body);
+  if (events.length === 0) {
+    console.info(`[yscp-events] 無法解析車牌事件 ${summarizeYscpEventBody(body)}`);
+    return Response.json({ code: "0", msg: "ok" });
+  }
+
+  console.info(
+    `[yscp-events] 收到 ${events.length} 筆車牌事件 ${events
+      .map((event) => `${event.plateNo}@${event.cameraIndexCode}`)
+      .join(",")}`,
+  );
+
   after(async () => {
     for (const event of events) {
       await processPlateEvent(event);

@@ -16,7 +16,7 @@ import {
 import type { ExitLane } from "../src/lib/kiosk/exit-lanes";
 import { ensureEventSubscription } from "../src/lib/yscp/event-api";
 import {
-  controlAlarmOutput,
+  pulseAlarmOutput,
   isLikelyLprCamera,
   listAlarmOutputs,
   listCameras,
@@ -327,8 +327,8 @@ const runInit = async () => {
       console.error("[-] 沒有可測試的繼電器");
       return;
     }
-    await controlAlarmOutput({ alarmOutputIndexCode: relay, action: 1 });
-    console.log(`[+] 已下發開閘 → ${relay}`);
+    const { holdMs } = await pulseAlarmOutput({ alarmOutputIndexCode: relay });
+    console.log(`[+] 已脈衝開閘 → ${relay}（${holdMs}ms 後關閉）`);
   }
 
   console.log("\n[+] YSCP 設定完成。請重啟 kiosk（npm run dev / npm run start）。");
@@ -380,8 +380,8 @@ const main = async () => {
       console.error("[-] 開閘測試需加上 --yes");
       process.exit(1);
     }
-    await controlAlarmOutput({ alarmOutputIndexCode: relay, action: 1 });
-    console.log(`[+] 已下發開閘 → ${relay}`);
+    const { holdMs } = await pulseAlarmOutput({ alarmOutputIndexCode: relay });
+    console.log(`[+] 已脈衝開閘 → ${relay}（${holdMs}ms 後關閉）`);
     return;
   }
   if (command === "lanes") {

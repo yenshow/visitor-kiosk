@@ -7,99 +7,98 @@ import {
   getVisitQueryRangeTaipei,
 } from "@/lib/kiosk/api-helpers";
 import { enrichRegisterList } from "@/lib/kiosk/appoint-enrichment";
-import { normalizePlateNo } from "@/lib/kiosk/plate";
 import {
-  getPresenceStore,
-  type DepartedEntry,
-  type PresenceEntry,
+  getVisitStore,
+  isDepartedToday,
+  visitToRegisterRecord,
+  type VisitorVisit,
 } from "@/lib/kiosk/presence";
 import {
   flattenRegisterList,
   isVisitNotEnded,
   type FlatRegisterRecord,
 } from "@/lib/kiosk/register-record";
-import { displayVisitorName } from "@/lib/kiosk/visitor-fields";
 
 export type KioskStats = {
   onSite: number;
   tempOut: number;
+  /** 今日離場（台北日） */
   departed: number;
+  /** 所有離場累計 */
+  departedTotal: number;
 };
 
 export type PresenceSnapshot = {
   onSitePeople: FlatRegisterRecord[];
   tempOutPeople: FlatRegisterRecord[];
-  tempOutById: Map<string, PresenceEntry>;
-  departed: DepartedEntry[];
+  visitsById: Map<string, VisitorVisit>;
+  departedAll: VisitorVisit[];
+  departedToday: VisitorVisit[];
 };
 
-/** YSCP 在廠清單 + 預約／本機補齊 + presence */
+/** YSCP 在廠 + 本機 on_site／temp_out（補齊 YSCP 延遲） */
 export const loadPresenceSnapshot = async (): Promise<PresenceSnapshot> => {
   const [registerPayload, appointPayload] = await Promise.all([
     getVisitorRegisterRecords(getVisitQueryRangeTaipei()),
     listAppointments({ ...getAppointQueryRangeTaipei() }),
   ]);
 
-  const rawList = flattenRegisterList(registerPayload.list);
-  const presence = await getPresenceStore(
-    new Set(rawList.map((item) => item.recordId)),
+  const store = await getVisitStore();
+  const visitsById = new Map(
+    store.visits.map((item) => [item.recordId, item]),
   );
-  const onSiteList = await enrichRegisterList(
-    rawList,
+  const activeList = enrichRegisterList(
+    flattenRegisterList(registerPayload.list),
     appointPayload.list,
-    presence.visitorMeta,
-  );
+    store.visits,
+  ).filter((item) => isVisitNotEnded(item.visitEndTime));
 
-  /** 統計／紀錄：結束時間已過者不計入在場中／臨時外出 */
-  const activeList = onSiteList.filter((item) =>
-    isVisitNotEnded(item.visitEndTime),
-  );
-  const tempOutIds = new Set(presence.tempOut.map((item) => item.recordId));
-  const enrichedById = new Map(
-    activeList.map((item) => [item.recordId, item]),
-  );
+  const onSitePeople: FlatRegisterRecord[] = [];
+  const tempOutPeople: FlatRegisterRecord[] = [];
+  const listedIds = new Set<string>();
 
-  const tempOutById = new Map(
-    presence.tempOut
-      .filter((item) => enrichedById.has(item.recordId))
-      .map((item) => {
-        const enriched = enrichedById.get(item.recordId);
-        return [
-          item.recordId,
-          {
-            ...item,
-            visitorName: displayVisitorName(
-              undefined,
-              undefined,
-              enriched?.visitorName || item.visitorName,
-            ),
-            plateNo:
-              normalizePlateNo(item.plateNo) ||
-              normalizePlateNo(enriched?.plateNo) ||
-              "",
-          },
-        ];
-      }),
-  );
+  for (const item of activeList) {
+    const status = visitsById.get(item.recordId)?.status;
+    if (status === "departed") continue;
+    if (status === "temp_out") {
+      tempOutPeople.push(item);
+    } else {
+      onSitePeople.push(item);
+    }
+    listedIds.add(item.recordId);
+  }
 
-  const departed = presence.departed.map((item) => ({
-    ...item,
-    visitorName: displayVisitorName(undefined, undefined, item.visitorName),
-    plateNo: normalizePlateNo(item.plateNo),
-  }));
+  for (const visit of store.visits) {
+    if (listedIds.has(visit.recordId)) continue;
+    if (visit.status === "on_site") {
+      onSitePeople.push(visitToRegisterRecord(visit));
+      listedIds.add(visit.recordId);
+      continue;
+    }
+    if (visit.status === "temp_out") {
+      tempOutPeople.push(visitToRegisterRecord(visit));
+      listedIds.add(visit.recordId);
+    }
+  }
+
+  const departedAll = store.visits.filter(
+    (item) => item.status === "departed",
+  );
 
   return {
-    onSitePeople: activeList.filter((item) => !tempOutIds.has(item.recordId)),
-    tempOutPeople: activeList.filter((item) => tempOutIds.has(item.recordId)),
-    tempOutById,
-    departed,
+    onSitePeople,
+    tempOutPeople,
+    visitsById,
+    departedAll,
+    departedToday: departedAll.filter((item) => isDepartedToday(item)),
   };
 };
 
 export const statsFromSnapshot = (snap: PresenceSnapshot): KioskStats => ({
   onSite: snap.onSitePeople.length,
   tempOut: snap.tempOutPeople.length,
-  departed: snap.departed.length,
+  departed: snap.departedToday.length,
+  departedTotal: snap.departedAll.length,
 });
 
 export const computeKioskStats = async (): Promise<KioskStats> =>

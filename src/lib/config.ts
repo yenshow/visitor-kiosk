@@ -7,6 +7,8 @@ import { EXIT_GATE_MINUTES_DEFAULT } from "@/lib/kiosk/ui-constants";
 export const YSCP_HTTPS_PORT = 443;
 export const YSCP_TIMEOUT_MS = 30_000;
 export const YSCP_GATE_DEDUP_MS = 5_000;
+/** 開閘後維持繼電器致能再送關閉（API 無自動脈衝） */
+export const YSCP_RELAY_HOLD_MS = 2_000;
 export const YSCP_REJECT_UNAUTHORIZED = false;
 export const YSCP_EVENT_TOKEN_DEFAULT = "Aa83124007";
 export const KIOSK_LISTEN_PORT = 3010;

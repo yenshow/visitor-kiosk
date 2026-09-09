@@ -7,6 +7,8 @@ type VisitorNoticeDialogProps = {
   title?: string;
   confirmLabel: string;
   loading?: boolean;
+  /** 僅施工事由為 true；其餘不顯示須知影片 */
+  showVideo?: boolean;
   onCancel: () => void;
   onConfirm: () => void;
 };
@@ -17,6 +19,7 @@ export const VisitorNoticeDialog = ({
   title = "訪客須知",
   confirmLabel,
   loading = false,
+  showVideo = false,
   onCancel,
   onConfirm,
 }: VisitorNoticeDialogProps) => {
@@ -73,16 +76,16 @@ export const VisitorNoticeDialog = ({
       updateReachedBottom();
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [fetching, content, videoAvailable]);
+  }, [fetching, content.length, showVideo, videoAvailable]);
 
   useEffect(() => {
-    if (!videoAvailable || videoSource.kind !== "file") return;
+    if (!showVideo || !videoAvailable || videoSource.kind !== "file") return;
     const video = videoRef.current;
     if (!video) return;
     void video.play().catch(() => {
       /* 觸控裝置可手動播放 */
     });
-  }, [videoAvailable, videoSource]);
+  }, [showVideo, videoAvailable, videoSource]);
 
   const canAccept = reachedBottom && !fetching;
 
@@ -108,47 +111,49 @@ export const VisitorNoticeDialog = ({
           className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-4"
           onScroll={updateReachedBottom}
         >
-          {videoAvailable ? (
-            <div className="overflow-hidden rounded-xl bg-slate-900">
-              {videoSource.kind === "youtube" ? (
-                <iframe
-                  className="aspect-video w-full bg-black"
-                  src={videoSource.embedSrc}
-                  title="訪客須知影片"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                  referrerPolicy="strict-origin-when-cross-origin"
-                />
-              ) : (
-                <video
-                  ref={videoRef}
-                  className="aspect-video w-full bg-black"
-                  controls
-                  playsInline
-                  preload="metadata"
-                  controlsList="nodownload"
-                  aria-label="訪客須知影片"
-                  src={videoSource.src}
-                  onError={() => setVideoAvailable(false)}
-                >
-                  您的瀏覽器不支援影片播放。
-                </video>
-              )}
-            </div>
-          ) : (
-            <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-base text-amber-800">
-              須知影片無法播放。請確認{" "}
-              <code className="rounded bg-amber-100 px-1">
-                NEXT_PUBLIC_NOTICE_VIDEO_URL
-              </code>{" "}
-              （YouTube／影片網址／資料夾，例如{" "}
-              <code className="rounded bg-amber-100 px-1">/videos/</code> →{" "}
-              <code className="rounded bg-amber-100 px-1">
-                /videos/notice.mp4
-              </code>
-              ）。
-            </p>
-          )}
+          {showVideo ? (
+            videoAvailable ? (
+              <div className="overflow-hidden rounded-xl bg-slate-900">
+                {videoSource.kind === "youtube" ? (
+                  <iframe
+                    className="aspect-video w-full bg-black"
+                    src={videoSource.embedSrc}
+                    title="訪客須知影片"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                    referrerPolicy="strict-origin-when-cross-origin"
+                  />
+                ) : (
+                  <video
+                    ref={videoRef}
+                    className="aspect-video w-full bg-black"
+                    controls
+                    playsInline
+                    preload="metadata"
+                    controlsList="nodownload"
+                    aria-label="訪客須知影片"
+                    src={videoSource.src}
+                    onError={() => setVideoAvailable(false)}
+                  >
+                    您的瀏覽器不支援影片播放。
+                  </video>
+                )}
+              </div>
+            ) : (
+              <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-base text-amber-800">
+                須知影片無法播放。請確認{" "}
+                <code className="rounded bg-amber-100 px-1">
+                  NEXT_PUBLIC_NOTICE_VIDEO_URL
+                </code>{" "}
+                （YouTube／影片網址／資料夾，例如{" "}
+                <code className="rounded bg-amber-100 px-1">/videos/</code> →{" "}
+                <code className="rounded bg-amber-100 px-1">
+                  /videos/notice.mp4
+                </code>
+                ）。
+              </p>
+            )
+          ) : null}
 
           {fetching ? (
             <p className="text-lg text-slate-500">載入中…</p>
