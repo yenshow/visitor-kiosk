@@ -1,3 +1,8 @@
+import {
+  parseExitLanes,
+  type ExitLane,
+} from "@/lib/kiosk/exit-lanes";
+
 const toBoolean = (raw: string | undefined, fallback: boolean): boolean => {
   if (raw === undefined || raw === "") return fallback;
   return ["1", "true", "yes", "on"].includes(String(raw).trim().toLowerCase());
@@ -39,6 +44,10 @@ export type AppConfig = {
     secretKey: string;
     rejectUnauthorized: boolean;
     timeoutMs: number;
+    eventDest: string;
+    eventToken: string;
+    exitLanes: ExitLane[];
+    gateDedupMs: number;
   };
 };
 
@@ -59,6 +68,10 @@ export const getConfig = (): AppConfig => {
         false,
       ),
       timeoutMs: toPositiveInt(process.env.HCP_TIMEOUT_MS, 30000),
+      eventDest: String(process.env.HCP_EVENT_DEST ?? "").trim(),
+      eventToken: String(process.env.HCP_EVENT_TOKEN ?? "").trim(),
+      exitLanes: parseExitLanes(process.env.HCP_EXIT_LANES),
+      gateDedupMs: toPositiveInt(process.env.HCP_GATE_DEDUP_MS, 5000),
     },
   };
 };

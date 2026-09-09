@@ -48,3 +48,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# AI agent（現場打包不需要；並已關閉 next.config agentRules）
+AGENTS.md
+CLAUDE.md
+.cursor/

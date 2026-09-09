@@ -8,15 +8,18 @@
 
 ```
 [ YSOP 前端 ]  →  [ Next.js /api/kiosk/* ]  →  [ YSCP Artemis HTTPS ]
+[ 出口 LPR ]   →  [ YSCP 事件推送 ]       →  [ Next.js /api/hcp/events ] → 比對名單 → alarmOutput 開閘
 ```
 
 - 金鑰與簽章只存在後端（`.env` 的 `HCP_AK` / `HCP_SK`；環境變數前綴仍為 HCP）。
 - 時區一律 `Asia/Taipei`（ISO 8601 `+08:00`）。
 - 報到／簽退下一步動作用一次性 token（記憶體、10 分鐘）；前端不帶 `appointID` 直打 Artemis。
-- YSOP 本地狀態檔：`data/kiosk-presence.json`（臨時外出、今日離場）。
+- YSOP 本地狀態檔：`data/kiosk-presence.json`（臨時外出、今日離場；亦作為出口開閘允許名單）。
 - YSOP 本機設定：`data/kiosk-settings.json`（跑馬燈、訪客預約開關、明暗主題、自訂 logo 檔名）；logo 檔 `data/kiosk-logo.*`。
 - 設定頁路由：`/setting`（不在首頁顯示設定按鈕）。主題以 `html.dark` + CSS 變數實作，並以 cookie `theme` 搭配 `public/theme-init.js` 防閃爍。
 - **前端對外敘述一律稱 YSCP**；程式碼／環境變數可保留 HCP 前綴。
+- **入場** LPR 時段權限由 YSCP 預約核准後下發；YSOP **不**控入場開閘。
+- **出場**由 YSOP 訂閱車牌上傳事件（131622），比對本機出場名單後呼叫繼電器開閘。
 
 ## 2. 業務流程
 
@@ -48,9 +51,10 @@
 3. **在場**：可選「臨時外出」或「正式簽退」。
 4. **臨時外出中**：僅可「正式簽退」；返回請走訪客報到。
 5. 模式：
-   - `temp`：只寫 YSOP `TEMP_OUT`，嘗試出口一次性放行（adapter，未接 API 時 no-op），**不**呼叫 `visitor/out`。入口 LPR 維持預約時段。返回須至訪客報到。
+   - `temp`：只寫 YSOP `TEMP_OUT`（出場允許名單），**不**呼叫 `visitor/out`、**不**在按鈕當下開閘。入口 LPR 維持預約時段。返回須至訪客報到。
    - `return`：由訪客報到呼叫，清除 `TEMP_OUT`；YSCP 不需異動。
-   - `final`：呼叫 `visitor/out`、清除 `TEMP_OUT`、記今日離場；人員門禁撤銷。入口車牌時段仍由 YSCP 控管至預約結束。
+   - `final`：呼叫 `visitor/out`、清除 `TEMP_OUT`、記今日離場（出場允許名單）；人員門禁撤銷。入口車牌時段仍由 YSCP 控管至預約結束。按鈕當下不開閘。
+6. **出口開閘**：車輛抵達出口 LPR → HCP 推送事件 131622 → YSOP Webhook 比對 `TEMP_OUT`／當日 `departedToday` 車牌 → 呼叫 `alarmOutput/controlling` 開閘。
 
 無操作倒數秒數由 `NEXT_PUBLIC_KIOSK_IDLE_SECONDS` 控制（預設 20）。
 
@@ -100,7 +104,9 @@
 | POST | `/api/kiosk/verify` | 報到查詢 `{ query }`（密碼或手機）；臨時外出中回 `tempOutRecords` |
 | POST | `/api/kiosk/checkin` | 報到 `{ token, acceptedNotice: true }` |
 | POST | `/api/kiosk/checkout/lookup` | 簽退查詢 `{ query }` → 全部匹配 |
-| POST | `/api/kiosk/checkout` | `{ token, mode?: "temp"\|"return"\|"final" }`（`return` 由報到畫面呼叫） |
+| POST | `/api/kiosk/checkout` | `{ token, mode?: "temp"\|"return"\|"final" }`（`return` 由報到畫面呼叫；只寫名單，不開閘） |
+| POST | `/api/kiosk/hcp/subscribe` | 手動向 YSCP 重訂車牌事件 131622 |
+| POST | `/api/hcp/events` | HCP 事件 Webhook（校驗 token → 立即 200 → 背景比對開閘） |
 
 ### 3.1 預約 `POST /api/kiosk/appoint`
 
@@ -127,7 +133,7 @@
 
 ### 3.4 簽退 `POST /api/kiosk/checkout`
 
-`mode` 預設 `final`。出口放行走 `requestVehicleExit(plateNo, mode)`（目前 no-op）。
+`mode` 預設 `final`。只更新本機出場允許名單（`tempOut`／`departedToday`）；實際開閘由出口 LPR 事件經 `/api/hcp/events` 觸發。
 
 ### 3.5 統計 `GET /api/kiosk/stats`
 
@@ -180,13 +186,24 @@ Header：`Accept`、`Content-Type`、`X-Ca-Key`（AK）、`X-Ca-Signature`。不
 | 簽退 | `/artemis/api/visitor/v1/visitor/out` |
 | 部門 | `/artemis/api/resource/v1/org/orgList` |
 | 人員 | `/artemis/api/resource/v1/person/advance/personList` |
-| 出口 LPR 放行 | （待確認；現由 `vehicle-exit` adapter no-op） |
+| 事件訂閱 | `/artemis/api/eventService/v1/eventSubscriptionByEventTypes`（`eventTypes: [131622]`） |
+| 出口開閘 | `/artemis/api/resource/v1/alarmOutput/controlling`（`action: 1`） |
 
 **建立預約** 可含 `VisitorInfo.plateNo`。
 
 **簽退** 僅正式簽退呼叫；臨時外出不呼叫。
 
-### 4.3 來訪事由
+### 4.3 出口 LPR 事件開閘
+
+1. 啟動時（`src/instrumentation.ts`）或手動 `POST /api/kiosk/hcp/subscribe`：向 YSCP 訂閱 `131622`，`eventDest`＝`HCP_EVENT_DEST`，`token`＝`HCP_EVENT_TOKEN`。
+2. YSCP 推送至 `POST /api/hcp/events`：校驗 token 後立即回 200，背景以 `after()` 處理。
+3. 僅處理 `HCP_EXIT_LANES` 內的出口相機；比對 `tempOut`／當日 `departedToday` 車牌。
+4. 同車牌＋同相機 `HCP_GATE_DEDUP_MS`（預設 5 秒）內不重複開閘。
+5. 比對成功則呼叫對應 `alarmOutputIndexCode` 開閘。
+
+**網路前提：** YSCP 伺服器必須能連到 kiosk 的 `HCP_EVENT_DEST`（多為 HTTPS）。
+
+### 4.4 來訪事由
 
 | 值 | Kiosk 顯示 |
 |----|------------|
@@ -211,6 +228,10 @@ Header：`Accept`、`Content-Type`、`X-Ca-Key`（AK）、`X-Ca-Signature`。不
 | `HCP_AK` / `HCP_SK` | OpenAPI 金鑰 |
 | `HCP_REJECT_UNAUTHORIZED` | 自簽憑證設 `false` |
 | `HCP_TIMEOUT_MS` | 逾時毫秒，預設 30000 |
+| `HCP_EVENT_DEST` | HCP 推送 Webhook 完整 URL（例：`https://ip:3010/api/hcp/events`） |
+| `HCP_EVENT_TOKEN` | 訂閱／推送校驗用自訂 token |
+| `HCP_EXIT_LANES` | JSON：`[{"cameraIndexCode":"...","alarmOutputIndexCode":"..."}]` |
+| `HCP_GATE_DEDUP_MS` | 開閘去重毫秒，預設 5000 |
 | `NEXT_PUBLIC_KIOSK_IDLE_SECONDS` | 倒數回首頁，預設 20 |
 | `NEXT_PUBLIC_NOTICE_VIDEO_URL` | 須知影片（YouTube／檔案／資料夾） |
 | `NEXT_PUBLIC_KIOSK_MARQUEE` | 首頁跑馬燈 |

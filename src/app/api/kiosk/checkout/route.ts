@@ -1,4 +1,3 @@
-import { requestVehicleExit } from "@/lib/hcp/vehicle-exit";
 import { visitorCheckOut } from "@/lib/hcp/visitor-api";
 import { jsonError, jsonOk } from "@/lib/kiosk/api-helpers";
 import {
@@ -22,7 +21,7 @@ const MESSAGES: Record<CheckoutMode, string> = {
   temp: "已登記臨時外出。請開車至出口；預約結束前返回請至「訪客報到」確認返回。",
   return: "已確認返回，狀態恢復為在場。",
   final:
-    "正式簽退成功，人員通行權限已撤銷。入口車牌時段權限仍由 YSCP 控管至預約結束。",
+    "正式簽退成功，人員通行權限已撤銷。入口車牌時段權限仍由 YSCP 控管至預約結束。請開車至出口。",
 };
 
 export const POST = async (request: Request) => {
@@ -45,13 +44,11 @@ export const POST = async (request: Request) => {
 
     if (mode === "temp") {
       await markTempOut({ recordId: appointRecordId, visitorName, plateNo });
-      void requestVehicleExit(plateNo, "temp").catch(() => undefined);
     } else if (mode === "return") {
       await clearTempOut(appointRecordId);
     } else {
       await visitorCheckOut(appointRecordId);
       await markDeparted({ recordId: appointRecordId, visitorName, plateNo });
-      void requestVehicleExit(plateNo, "final").catch(() => undefined);
     }
 
     consumeCheckoutToken(token);

@@ -6,8 +6,7 @@ import type { NextConfig } from "next";
  * 可用環境變數 ALLOWED_DEV_ORIGINS 覆寫，逗號分隔。
  */
 const allowedDevOrigins = String(
-  process.env.ALLOWED_DEV_ORIGINS ||
-    "localhost,127.0.0.1,192.168.2.8,*.local",
+  process.env.ALLOWED_DEV_ORIGINS || "localhost,127.0.0.1,192.168.2.8,*.local",
 )
   .split(",")
   .map((s) => s.trim())
@@ -15,6 +14,7 @@ const allowedDevOrigins = String(
 
 const nextConfig: NextConfig = {
   allowedDevOrigins,
+  agentRules: false,
 };
 
 export default nextConfig;
