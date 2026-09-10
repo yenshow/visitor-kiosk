@@ -12,11 +12,8 @@ type KioskShellProps = {
   logoUrl?: string;
 };
 
-const SHELL_MAIN_HOME =
-  "mx-auto flex min-h-0 w-full flex-1 flex-col px-4 pt-8 landscape:w-3/4 landscape:max-w-7xl landscape:px-0 landscape:pt-12";
-
-const SHELL_MAIN_FLOW =
-  "mx-auto flex min-h-0 w-full flex-1 flex-col px-4 py-3 landscape:w-3/4 landscape:max-w-7xl landscape:px-0 landscape:py-4";
+const SHELL_MAIN =
+  "mx-auto flex min-h-0 w-full flex-1 flex-col px-4 landscape:w-3/4 landscape:max-w-7xl landscape:px-0";
 
 /** 跑馬燈對齊 ba SafetyBanner：固定 bg-blue-600，不隨主題變色 */
 const MarqueeBanner = ({ text }: { text: string }) => (
@@ -59,7 +56,11 @@ export const KioskShell = ({
     >
       {isHome ? <MarqueeBanner text={marqueeText} /> : null}
 
-      <div className={isHome ? SHELL_MAIN_HOME : SHELL_MAIN_FLOW}>
+      <div
+        className={`${SHELL_MAIN} ${
+          isHome ? "pt-8 landscape:pt-12" : "py-3 landscape:py-4"
+        }`}
+      >
         {!hasCredentials ? (
           <div
             className="rounded-2xl border border-red-300/70 bg-red-950/40 px-4 py-3 text-center text-base text-red-100"

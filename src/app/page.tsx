@@ -34,7 +34,7 @@ const FlowPanel = ({
   children: ReactNode;
   wide?: boolean;
 }) => (
-  <div className="w-full flex-1 overflow-x-hidden portrait:overflow-y-visible landscape:min-h-0 landscape:overflow-y-auto">
+  <div className="w-full flex-1 overflow-x-hidden landscape:min-h-0 landscape:overflow-y-auto">
     <div className="flex flex-col justify-start pb-4 landscape:min-h-full landscape:justify-center landscape:pb-0">
       <div className={`mx-auto w-full ${wide ? "max-w-3xl" : "max-w-2xl"}`}>
         {children}
@@ -160,7 +160,6 @@ export default function HomePage() {
       {recordsOpen ? (
         <RecordsDialog
           key={recordsFilter}
-          open
           initialFilter={recordsFilter}
           onClose={() => setRecordsOpen(false)}
         />

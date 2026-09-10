@@ -15,21 +15,15 @@ type AppointFormProps = {
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
-/** 現場日 YYYY-MM-DD（以裝置本地日為準；機台應設台北時區） */
 const todayDateKey = () => {
   const d = new Date();
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 };
 
-const todayLabel = () => {
-  const d = new Date();
-  return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())}`;
-};
-
 const defaultTimes = () => ({ start: "09:00", end: "18:00" });
 
 const FIELD_CLASS =
-  "box-border min-h-14 w-full min-w-0 max-w-full rounded-xl border border-slate-300 bg-white px-4 text-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30";
+  "min-h-14 w-full min-w-0 max-w-full rounded-xl border border-slate-300 bg-white px-4 text-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30";
 
 /** 當日 HH:mm → ISO 8601 +08:00（僅限當日、不可跨日） */
 const toTaipeiIsoFromTodayTime = (time: string): string => {
@@ -135,8 +129,8 @@ export const AppointForm = ({ idleSeconds, onHome }: AppointFormProps) => {
 
   return (
     <FlowCard title="訪客預約" onBack={onHome}>
-      <div className="grid min-w-0 gap-3 sm:grid-cols-2">
-        <label className="block min-w-0">
+      <div className="grid min-w-0 gap-3 *:min-w-0 sm:grid-cols-2">
+        <label className="block">
           <span className="mb-1 block text-sm font-medium text-slate-600">
             姓
           </span>
@@ -149,7 +143,7 @@ export const AppointForm = ({ idleSeconds, onHome }: AppointFormProps) => {
             aria-label="訪客姓"
           />
         </label>
-        <label className="block min-w-0">
+        <label className="block">
           <span className="mb-1 block text-sm font-medium text-slate-600">
             名
           </span>
@@ -162,7 +156,7 @@ export const AppointForm = ({ idleSeconds, onHome }: AppointFormProps) => {
             aria-label="訪客名"
           />
         </label>
-        <label className="block min-w-0">
+        <label className="block">
           <span className="mb-1 block text-sm font-medium text-slate-600">
             Email <span className="text-red-600">*</span>
           </span>
@@ -179,7 +173,7 @@ export const AppointForm = ({ idleSeconds, onHome }: AppointFormProps) => {
             aria-required="true"
           />
         </label>
-        <label className="block min-w-0">
+        <label className="block">
           <span className="mb-1 block text-sm font-medium text-slate-600">
             公司
           </span>
@@ -192,7 +186,7 @@ export const AppointForm = ({ idleSeconds, onHome }: AppointFormProps) => {
             aria-label="公司名稱"
           />
         </label>
-        <label className="block min-w-0">
+        <label className="block">
           <span className="mb-1 block text-sm font-medium text-slate-600">
             手機號碼 <span className="text-red-600">*</span>
           </span>
@@ -211,7 +205,7 @@ export const AppointForm = ({ idleSeconds, onHome }: AppointFormProps) => {
             aria-required="true"
           />
         </label>
-        <label className="block min-w-0">
+        <label className="block">
           <span className="mb-1 block text-sm font-medium text-slate-600">
             車牌
           </span>
@@ -230,14 +224,14 @@ export const AppointForm = ({ idleSeconds, onHome }: AppointFormProps) => {
             aria-label="車牌號碼"
           />
         </label>
-        <div className="block min-w-0 sm:col-span-2">
+        <div className="block sm:col-span-2">
           <HostPicker
             selectedHost={selectedHost}
             onSelect={setSelectedHost}
             onError={setError}
           />
         </div>
-        <div className="block min-w-0 sm:col-span-2">
+        <div className="block sm:col-span-2">
           <span className="mb-2 block text-sm font-medium text-slate-600">
             來訪事由
           </span>
@@ -267,7 +261,7 @@ export const AppointForm = ({ idleSeconds, onHome }: AppointFormProps) => {
             })}
           </div>
         </div>
-        <label className="block min-w-0">
+        <label className="block">
           <span className="mb-1 block text-sm font-medium text-slate-600">
             開始時間
           </span>
@@ -279,7 +273,7 @@ export const AppointForm = ({ idleSeconds, onHome }: AppointFormProps) => {
             aria-label="開始時間（僅限當日）"
           />
         </label>
-        <label className="block min-w-0">
+        <label className="block">
           <span className="mb-1 block text-sm font-medium text-slate-600">
             結束時間
           </span>
