@@ -104,6 +104,20 @@ textarea {
   color: #0f172a;
 }
 
+/* iOS Safari：原生 time 控件固有寬度易撐破容器 */
+input[type="time"] {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+input[type="time"]::-webkit-date-and-time-value {
+  text-align: left;
+  min-width: 0;
+}
+
 input::placeholder,
 textarea::placeholder {
   color: #94a3b8;

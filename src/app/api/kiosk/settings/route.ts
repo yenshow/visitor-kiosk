@@ -1,6 +1,7 @@
 import { jsonError, jsonOk } from "@/lib/kiosk/api-helpers";
 import {
   getSettings,
+  normalizeApproverEmails,
   toSettingsView,
   updateSettings,
 } from "@/lib/kiosk/settings";
@@ -25,6 +26,7 @@ type PutBody = {
   marquee?: string;
   showAppoint?: boolean;
   theme?: string;
+  approverEmails?: string[] | string;
 };
 
 export const PUT = async (request: Request) => {
@@ -34,6 +36,7 @@ export const PUT = async (request: Request) => {
       marquee?: string;
       showAppoint?: boolean;
       theme?: "light" | "dark";
+      approverEmails?: string[];
     } = {};
 
     if (typeof body.marquee === "string") {
@@ -44,6 +47,9 @@ export const PUT = async (request: Request) => {
     }
     if (body.theme === "light" || body.theme === "dark") {
       patch.theme = normalizeTheme(body.theme);
+    }
+    if (body.approverEmails !== undefined) {
+      patch.approverEmails = normalizeApproverEmails(body.approverEmails);
     }
 
     const settings = await updateSettings(patch);

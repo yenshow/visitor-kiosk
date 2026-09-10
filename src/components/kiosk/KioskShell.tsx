@@ -13,10 +13,10 @@ type KioskShellProps = {
 };
 
 const SHELL_MAIN_HOME =
-  "mx-auto flex min-h-0 w-3/4 flex-1 flex-col pt-8 landscape:max-w-7xl landscape:pt-12";
+  "mx-auto flex min-h-0 w-full flex-1 flex-col px-4 pt-8 landscape:w-3/4 landscape:max-w-7xl landscape:px-0 landscape:pt-12";
 
 const SHELL_MAIN_FLOW =
-  "mx-auto flex min-h-0 w-3/4 flex-1 flex-col py-3 landscape:max-w-7xl landscape:py-4";
+  "mx-auto flex min-h-0 w-full flex-1 flex-col px-4 py-3 landscape:w-3/4 landscape:max-w-7xl landscape:px-0 landscape:py-4";
 
 /** 跑馬燈對齊 ba SafetyBanner：固定 bg-blue-600，不隨主題變色 */
 const MarqueeBanner = ({ text }: { text: string }) => (
@@ -50,7 +50,13 @@ export const KioskShell = ({
   const marqueeText = marquee?.trim() || DEFAULT_MARQUEE;
 
   return (
-    <div className="flex h-dvh max-h-dvh flex-col overflow-hidden bg-(image:--shell-gradient) text-(--text-primary)">
+    <div
+      className={
+        isHome
+          ? "flex h-dvh max-h-dvh flex-col overflow-hidden bg-(image:--shell-gradient) text-(--text-primary)"
+          : "flex min-h-dvh flex-col overflow-x-hidden overflow-y-auto bg-(image:--shell-gradient) text-(--text-primary) landscape:h-dvh landscape:max-h-dvh landscape:overflow-hidden"
+      }
+    >
       {isHome ? <MarqueeBanner text={marqueeText} /> : null}
 
       <div className={isHome ? SHELL_MAIN_HOME : SHELL_MAIN_FLOW}>
@@ -66,7 +72,13 @@ export const KioskShell = ({
 
         {isHome ? <KioskHeader logoUrl={logoUrl} /> : null}
 
-        <div className="flex min-h-0 flex-1 flex-col justify-center">
+        <div
+          className={
+            isHome
+              ? "flex min-h-0 flex-1 flex-col justify-center"
+              : "flex min-h-0 flex-1 flex-col justify-start landscape:justify-center"
+          }
+        >
           {children}
         </div>
       </div>

@@ -8,12 +8,15 @@ import {
   taipeiDateKeyFromIso,
   toTaipeiDateKey,
 } from "@/lib/kiosk/api-helpers";
+import { notifyApproversOfPendingAppointment } from "@/lib/kiosk/approver-mail";
 import { normalizePlateNo } from "@/lib/kiosk/plate";
 import { normalizePhoneDigits } from "@/lib/kiosk/phone";
 import { isValidEmail } from "@/lib/kiosk/visitor-fields";
 
 type AppointBody = {
   receptionistId?: string;
+  receptionistName?: string;
+  orgLabel?: string;
   appointStartTime?: string;
   appointEndTime?: string;
   visitReasonType?: number;
@@ -31,6 +34,8 @@ export const POST = async (request: Request) => {
     const body = (await request.json()) as AppointBody;
 
     const receptionistId = String(body.receptionistId ?? "").trim();
+    const receptionistName = String(body.receptionistName ?? "").trim();
+    const orgLabel = String(body.orgLabel ?? "").trim();
     const visitorFamilyName = String(body.visitorFamilyName ?? "").trim();
     const visitorGivenName = String(body.visitorGivenName ?? "").trim();
     const appointStartTime = String(body.appointStartTime ?? "").trim();
@@ -94,6 +99,22 @@ export const POST = async (request: Request) => {
       automaticApproval === 1
         ? "預約已送出，系統審核中。確認完成後將提供預約密碼，請再使用「訪客報到」。"
         : "預約已送出，請等待內部人員確認。確認完成後將由系統提供預約密碼，再使用「訪客報到」。";
+
+    if (automaticApproval !== 1) {
+      void notifyApproversOfPendingAppointment({
+        visitorFamilyName,
+        visitorGivenName,
+        companyName,
+        phoneNo,
+        email,
+        plateNo: plateNo || "",
+        visitReasonType,
+        appointStartTime,
+        appointEndTime,
+        receptionistName,
+        orgLabel,
+      });
+    }
 
     return jsonOk({
       appointRecordId: result.appointRecordId ?? null,

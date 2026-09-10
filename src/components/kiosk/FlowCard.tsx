@@ -10,8 +10,8 @@ type FlowCardProps = {
 };
 
 export const FlowCard = ({ title, onBack, children }: FlowCardProps) => (
-  <div className="flex w-full flex-col items-center">
-    <div className="w-full rounded-3xl bg-white p-6 text-slate-900 shadow-xl scheme-light">
+  <div className="flex w-full min-w-0 flex-col items-center">
+    <div className="w-full min-w-0 overflow-x-hidden rounded-3xl bg-white p-6 text-slate-900 shadow-xl scheme-light">
       <h2 className="mb-4 text-center text-3xl font-bold">{title}</h2>
       {children}
     </div>

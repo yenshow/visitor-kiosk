@@ -40,6 +40,19 @@ const parseYscpHost = (
   };
 };
 
+export const SMTP_HOST_DEFAULT = "smtp.office365.com";
+export const SMTP_PORT_DEFAULT = 587;
+
+export type SmtpConfig = {
+  host: string;
+  port: number;
+  user: string;
+  pass: string;
+  from: string;
+  /** 帳密齊備才可寄信 */
+  configured: boolean;
+};
+
 export type AppConfig = {
   yscp: {
     hostname: string;
@@ -56,6 +69,7 @@ export type AppConfig = {
     /** 離場開閘時限（分鐘） */
     exitGateMinutes: number;
   };
+  smtp: SmtpConfig;
 };
 
 const parsePositiveInt = (raw: string, fallback: number): number => {
@@ -68,6 +82,10 @@ export const getConfig = (): AppConfig => {
   const parsed = parseYscpHost(env("YSCP_HOST") || "127.0.0.1");
   const port = parsed.port ?? YSCP_HTTPS_PORT;
   const hostname = parsed.hostname;
+
+  const smtpUser = env("SMTP_USER");
+  const smtpPass = env("SMTP_PASS");
+  const smtpFrom = env("MAIL_FROM") || smtpUser;
 
   return {
     yscp: {
@@ -86,6 +104,14 @@ export const getConfig = (): AppConfig => {
         env("YSCP_EXIT_GATE_MINUTES"),
         EXIT_GATE_MINUTES_DEFAULT,
       ),
+    },
+    smtp: {
+      host: env("SMTP_HOST") || SMTP_HOST_DEFAULT,
+      port: parsePositiveInt(env("SMTP_PORT"), SMTP_PORT_DEFAULT),
+      user: smtpUser,
+      pass: smtpPass,
+      from: smtpFrom,
+      configured: Boolean(smtpUser && smtpPass),
     },
   };
 };

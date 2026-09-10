@@ -34,8 +34,8 @@ const FlowPanel = ({
   children: ReactNode;
   wide?: boolean;
 }) => (
-  <div className="min-h-0 w-full flex-1 overflow-y-auto">
-    <div className="flex min-h-full flex-col justify-center">
+  <div className="w-full flex-1 overflow-x-hidden portrait:overflow-y-visible landscape:min-h-0 landscape:overflow-y-auto">
+    <div className="flex flex-col justify-start pb-4 landscape:min-h-full landscape:justify-center landscape:pb-0">
       <div className={`mx-auto w-full ${wide ? "max-w-3xl" : "max-w-2xl"}`}>
         {children}
       </div>

@@ -6,6 +6,7 @@ import {
   type KioskTheme,
 } from "@/lib/kiosk/theme";
 import { DEFAULT_MARQUEE } from "@/lib/kiosk/ui-constants";
+import { isValidEmail } from "@/lib/kiosk/visitor-fields";
 
 export type KioskSettings = {
   marquee: string;
@@ -13,6 +14,8 @@ export type KioskSettings = {
   theme: KioskTheme;
   /** 自訂 logo 檔名（位於 data/）；空字串表示使用預設 public logo */
   logoFileName: string;
+  /** 現場預約待核准時同步通知的信箱（空＝不寄） */
+  approverEmails: string[];
 };
 
 const DATA_DIR = path.join(process.cwd(), "data");
@@ -35,13 +38,37 @@ const EXT_BY_MIME: Record<string, string> = {
 };
 
 export const LOGO_MAX_BYTES = 2 * 1024 * 1024;
+export const APPROVER_EMAILS_MAX = 20;
 
 const emptySettings = (): KioskSettings => ({
   marquee: "",
   showAppoint: true,
   theme: DEFAULT_THEME,
   logoFileName: "",
+  approverEmails: [],
 });
+
+/** 去空白、驗證格式、去重（不分大小寫）、上限 APPROVER_EMAILS_MAX */
+export const normalizeApproverEmails = (raw: unknown): string[] => {
+  const list = Array.isArray(raw)
+    ? raw
+    : typeof raw === "string"
+      ? raw.split(/[\n,;]+/)
+      : [];
+
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const item of list) {
+    const email = String(item ?? "").trim();
+    if (!email || !isValidEmail(email)) continue;
+    const key = email.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(email);
+    if (result.length >= APPROVER_EMAILS_MAX) break;
+  }
+  return result;
+};
 
 let writeChain: Promise<void> = Promise.resolve();
 
@@ -56,6 +83,7 @@ const readStore = async (): Promise<KioskSettings> => {
       theme: normalizeTheme(parsed.theme),
       logoFileName:
         typeof parsed.logoFileName === "string" ? parsed.logoFileName : "",
+      approverEmails: normalizeApproverEmails(parsed.approverEmails),
     };
   } catch {
     return emptySettings();
@@ -82,7 +110,9 @@ const safeUnlink = async (filePath: string | null) => {
 export const getSettings = async (): Promise<KioskSettings> => readStore();
 
 export const updateSettings = async (
-  patch: Partial<Pick<KioskSettings, "marquee" | "showAppoint" | "theme">>,
+  patch: Partial<
+    Pick<KioskSettings, "marquee" | "showAppoint" | "theme" | "approverEmails">
+  >,
 ): Promise<KioskSettings> => {
   const current = await readStore();
   const next: KioskSettings = {
@@ -93,6 +123,9 @@ export const updateSettings = async (
       : {}),
     ...(patch.theme === "light" || patch.theme === "dark"
       ? { theme: patch.theme }
+      : {}),
+    ...(Array.isArray(patch.approverEmails)
+      ? { approverEmails: normalizeApproverEmails(patch.approverEmails) }
       : {}),
   };
   await writeStore(next);
@@ -175,4 +208,5 @@ export const toSettingsView = (settings: KioskSettings) => ({
   logoUrl: settings.logoFileName
     ? `/api/kiosk/settings/logo?v=${encodeURIComponent(settings.logoFileName)}`
     : "/yenshow-logo.svg",
+  approverEmails: settings.approverEmails,
 });
