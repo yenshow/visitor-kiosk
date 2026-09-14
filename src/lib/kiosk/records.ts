@@ -7,7 +7,7 @@ import { displayVisitorName } from "@/lib/kiosk/visitor-fields";
 import type { FlatRegisterRecord } from "@/lib/kiosk/register-record";
 import type { VisitorVisit } from "@/lib/kiosk/presence";
 
-export type RecordPresence = "on_site" | "temp_out" | "departed";
+export type RecordPresence = "on_site" | "temp_out" | "overstay" | "departed";
 
 export type VisitorRecordRow = {
   recordId: string;
@@ -61,6 +61,15 @@ const activeAt = (
   return visit?.checkinAt || item.registerTime || item.visitStartTime || "";
 };
 
+const rowFields = (item: FlatRegisterRecord) => ({
+  recordId: item.recordId,
+  visitorName: item.visitorName,
+  phoneNo: item.phoneNo,
+  plateNo: item.plateNo,
+  companyName: item.companyName,
+  receptionistName: item.receptionistName,
+});
+
 export const listVisitorRecords =
   async (): Promise<VisitorRecordsPayload> => {
     const snap = await loadPresenceSnapshot();
@@ -70,21 +79,35 @@ export const listVisitorRecords =
       ...snap.onSitePeople.map((item) =>
         toRow(
           "on_site",
-          item,
+          rowFields(item),
           activeAt(snap.visitsById.get(item.recordId), item, false),
         ),
       ),
       ...snap.tempOutPeople.map((item) =>
         toRow(
           "temp_out",
-          item,
+          rowFields(item),
           activeAt(snap.visitsById.get(item.recordId), item, true),
+        ),
+      ),
+      ...snap.overstayPeople.map((item) =>
+        toRow(
+          "overstay",
+          rowFields(item),
+          activeAt(snap.visitsById.get(item.recordId), item, false),
         ),
       ),
       ...snap.departedAll.map((item) =>
         toRow(
           "departed",
-          item,
+          {
+            recordId: item.recordId,
+            visitorName: item.visitorName,
+            phoneNo: item.phoneNo,
+            plateNo: item.plateNo,
+            companyName: item.companyName,
+            receptionistName: item.receptionistName,
+          },
           item.departedAt || item.checkinAt,
           todayIds.has(item.recordId),
         ),

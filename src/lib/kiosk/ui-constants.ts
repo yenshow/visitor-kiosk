@@ -12,6 +12,7 @@ export type RecordsFilter =
   | "all"
   | "on_site"
   | "temp_out"
+  | "overstay"
   | "departed_today"
   | "departed";
 

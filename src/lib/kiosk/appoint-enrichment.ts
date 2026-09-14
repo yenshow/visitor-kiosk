@@ -60,9 +60,9 @@ const findAppointEnrichment = (
   index: ReturnType<typeof buildAppointEnrichmentIndex>,
   flat: Pick<FlatRegisterRecord, "visitorId" | "phoneNo">,
 ): AppointEnrichment | null => {
-  if (flat.visitorId) {
-    const byId = index.byVisitorId.get(flat.visitorId);
-    if (byId) return byId;
+  const visitorId = String(flat.visitorId ?? "").trim();
+  if (visitorId) {
+    return index.byVisitorId.get(visitorId) ?? null;
   }
   const phone = normalizePhoneDigits(flat.phoneNo);
   if (phone) return index.byPhone.get(phone) ?? null;
@@ -110,7 +110,10 @@ const mergeRegisterFields = (
       String(enrich?.receptionistName ?? "").trim() ||
       "",
     visitEndTime:
-      flat.visitEndTime || String(enrich?.visitEndTime ?? "").trim() || "",
+      String(visit?.visitEndTime ?? "").trim() ||
+      flat.visitEndTime ||
+      String(enrich?.visitEndTime ?? "").trim() ||
+      "",
   };
 };
 

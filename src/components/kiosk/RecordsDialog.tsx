@@ -7,7 +7,7 @@ import type { RecordsFilter } from "@/lib/kiosk/ui-constants";
 
 type VisitorRecordRow = {
   recordId: string;
-  presence: "on_site" | "temp_out" | "departed";
+  presence: "on_site" | "temp_out" | "overstay" | "departed";
   visitorName: string;
   phoneNo: string;
   plateNo: string;
@@ -24,7 +24,13 @@ type RecordsDialogProps = {
 
 const PAGE_SIZE = 10;
 
-const SUMMARY_COLS = ["目前在場", "臨時外出", "今日離場", "所有離場"] as const;
+const SUMMARY_COLS = [
+  "目前在場",
+  "臨時外出",
+  "逾期在場",
+  "今日離場",
+  "所有離場",
+] as const;
 const DETAIL_COLS = [
   "狀態",
   "姓名",
@@ -38,6 +44,7 @@ const DETAIL_COLS = [
 const PRESENCE_LABEL: Record<VisitorRecordRow["presence"], string> = {
   on_site: "目前在場",
   temp_out: "臨時外出",
+  overstay: "逾期在場",
   departed: "已離場",
 };
 
@@ -45,6 +52,7 @@ const FILTER_OPTIONS: { value: RecordsFilter; label: string }[] = [
   { value: "all", label: "全部" },
   { value: "on_site", label: "目前在場" },
   { value: "temp_out", label: "臨時外出" },
+  { value: "overstay", label: "逾期在場" },
   { value: "departed_today", label: "今日離場" },
   { value: "departed", label: "所有離場" },
 ];
@@ -83,6 +91,7 @@ const matchesFilter = (
   if (filter === "all") return true;
   if (filter === "on_site") return row.presence === "on_site";
   if (filter === "temp_out") return row.presence === "temp_out";
+  if (filter === "overstay") return row.presence === "overstay";
   if (filter === "departed_today") {
     return row.presence === "departed" && Boolean(row.isDepartedToday);
   }
@@ -171,6 +180,7 @@ export const RecordsDialog = ({
     ? [
         summary.onSite,
         summary.tempOut,
+        summary.overstay,
         summary.departed,
         summary.departedTotal ?? summary.departed,
       ]

@@ -62,6 +62,7 @@ export const POST = async (request: Request) => {
     await upsertVisitOnCheckin({
       recordId: String(result.appointRecordId ?? "").trim(),
       visitorId,
+      appointId,
       visitorName: displayVisitorName(
         info?.visitorFamilyName,
         info?.visitorGivenName,
@@ -74,6 +75,7 @@ export const POST = async (request: Request) => {
       visitReasonType: Number.isFinite(visitPurposeType)
         ? visitPurposeType
         : undefined,
+      visitEndTime,
     });
 
     void reapplyAuth(visitorId).catch(() => undefined);

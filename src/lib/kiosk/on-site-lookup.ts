@@ -3,6 +3,10 @@ import { getVisitQueryRangeTaipei } from "@/lib/kiosk/api-helpers";
 import { enrichRegisterList } from "@/lib/kiosk/appoint-enrichment";
 import { normalizePhoneDigits, normalizePlateNo } from "@/lib/kiosk/normalize";
 import {
+  classifyActivePresence,
+  effectiveVisitEndTime,
+} from "@/lib/kiosk/presence-classify";
+import {
   getVisitStore,
   visitToRegisterRecord,
   type VisitorVisit,
@@ -22,6 +26,8 @@ import {
 type OnSiteLookupResult = {
   records: OnSiteRecordView[];
   appointNotFound: boolean;
+  /** 預約命中但缺少 visitorId，無法對應在廠列 */
+  incompleteVisitorId?: boolean;
 };
 
 const resolveReason = (
@@ -36,19 +42,22 @@ const resolveReason = (
     };
   }
 
-  const byVisitor = appointList.find(
-    (item) =>
-      flat.visitorId &&
-      String(item.visitorInfo?.visitorId ?? "").trim() === flat.visitorId,
-  );
-  const phone = normalizePhoneDigits(flat.phoneNo);
-  const hit =
-    byVisitor ??
-    appointList.find(
+  const visitorId = String(flat.visitorId ?? "").trim();
+  let hit: AppointmentItem | undefined;
+  if (visitorId) {
+    hit = appointList.find(
       (item) =>
-        phone &&
-        normalizePhoneDigits(item.visitorInfo?.phoneNo ?? "") === phone,
+        String(item.visitorInfo?.visitorId ?? "").trim() === visitorId,
     );
+  } else {
+    const phone = normalizePhoneDigits(flat.phoneNo);
+    if (phone) {
+      hit = appointList.find(
+        (item) =>
+          normalizePhoneDigits(item.visitorInfo?.phoneNo ?? "") === phone,
+      );
+    }
+  }
   if (!hit) return {};
 
   const visitReasonType = Number(hit.visitReasonType);
@@ -68,12 +77,20 @@ const toView = (
   flat: FlatRegisterRecord,
   visit: VisitorVisit | undefined,
   appointList: AppointmentItem[],
+  inYscpRegisterList: boolean,
 ): OnSiteRecordView => {
   const plateNo = normalizePlateNo(flat.plateNo);
   const visitorName = flat.visitorName || "—";
   const phoneNo = normalizePhoneDigits(flat.phoneNo);
   const isTemp = visit?.status === "temp_out";
   const reason = resolveReason(visit, flat, appointList);
+  const visitEndTime = effectiveVisitEndTime(flat, visit);
+  const bucket = classifyActivePresence({
+    visit,
+    flat,
+    inYscpRegisterList,
+  });
+  const isOverstay = bucket === "overstay";
 
   return {
     token: createCheckoutToken({
@@ -94,8 +111,9 @@ const toView = (
     visitReasonType: reason.visitReasonType,
     visitReason: reason.visitReason,
     visitStartTime: flat.visitStartTime || flat.registerTime,
-    visitEndTime: flat.visitEndTime,
+    visitEndTime,
     visitingTime: flat.registerTime || flat.visitStartTime,
+    isOverstay,
   };
 };
 
@@ -134,17 +152,13 @@ export const lookupOnSiteRecords = async (input: {
       .map((item) => String(item.visitorInfo?.visitorId ?? "").trim())
       .filter(Boolean),
   );
-  // 僅在使用者「以手機查詢」時才用手機比對在廠記錄；預約碼查詢只應鎖定 visitorId，避免同號多人
-  const filterPhones = new Set(
-    phoneNo
-      ? [
-          phoneNo,
-          ...appointList.map((item) =>
-            normalizePhoneDigits(item.visitorInfo?.phoneNo ?? ""),
-          ),
-        ].filter(Boolean)
-      : [],
-  );
+
+  if (appointCode && appointList.length > 0 && filterVisitorIds.size === 0) {
+    return { records: [], appointNotFound: false, incompleteVisitorId: true };
+  }
+
+  // 僅「手機查詢」才用手機比對；預約碼只鎖 visitorId
+  const filterPhones = new Set(phoneNo ? [phoneNo] : []);
 
   const store = await getVisitStore();
   const visitById = new Map(store.visits.map((item) => [item.recordId, item]));
@@ -172,7 +186,7 @@ export const lookupOnSiteRecords = async (input: {
     }
     const visit = visitById.get(item.recordId);
     if (visit?.status === "departed") continue;
-    records.push(toView(item, visit, appointList));
+    records.push(toView(item, visit, appointList, true));
     listedIds.add(item.recordId);
   }
 
@@ -190,7 +204,7 @@ export const lookupOnSiteRecords = async (input: {
       continue;
     }
     records.push(
-      toView(visitToRegisterRecord(visit), visit, appointList),
+      toView(visitToRegisterRecord(visit), visit, appointList, false),
     );
   }
 

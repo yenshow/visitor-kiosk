@@ -4,6 +4,7 @@ import type { RecordsFilter } from "@/lib/kiosk/ui-constants";
 export type KioskStatsView = {
   onSite: number;
   tempOut: number;
+  overstay: number;
   /** 今日離場 */
   departed: number;
   /** 所有離場累計 */

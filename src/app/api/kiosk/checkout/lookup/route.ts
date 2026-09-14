@@ -20,6 +20,13 @@ export const POST = async (request: Request) => {
       return jsonError("查無此預約密碼對應的在廠記錄", 404);
     }
 
+    if (result.incompleteVisitorId) {
+      return jsonError(
+        "預約資料缺少訪客識別，無法對應在廠記錄，請洽接待人員",
+        404,
+      );
+    }
+
     if (result.records.length === 0) {
       return jsonError("查無在廠簽到記錄，請確認已報到或洽接待人員", 404);
     }

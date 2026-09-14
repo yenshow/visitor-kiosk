@@ -15,6 +15,7 @@ export type VisitorVisit = {
   recordId: string;
   status: VisitStatus;
   visitorId?: string;
+  appointId?: string;
   visitorName: string;
   phoneNo: string;
   plateNo: string;
@@ -22,6 +23,8 @@ export type VisitorVisit = {
   receptionistName: string;
   /** YSCP 來訪事由代碼；施工＝4，跨日返回須知影片用 */
   visitReasonType?: number;
+  /** 來訪截止（與 YSCP 報到 visitEndTime 一致） */
+  visitEndTime?: string;
   checkinAt: string;
   tempOutAt?: string;
   departedAt?: string;
@@ -34,12 +37,14 @@ export type VisitStore = {
 type VisitFieldsInput = {
   recordId: string;
   visitorId?: string;
+  appointId?: string;
   visitorName?: string;
   phoneNo?: string;
   plateNo?: string;
   companyName?: string;
   receptionistName?: string;
   visitReasonType?: number;
+  visitEndTime?: string;
 };
 
 /** 舊檔相容欄位（遷移後不再寫出） */
@@ -84,6 +89,10 @@ const mergeFields = (
     visitReasonType: Number.isFinite(reasonRaw)
       ? reasonRaw
       : prev?.visitReasonType,
+    visitEndTime:
+      String(entry.visitEndTime ?? "").trim() || prev?.visitEndTime || undefined,
+    appointId:
+      String(entry.appointId ?? "").trim() || prev?.appointId || undefined,
   };
 };
 
@@ -96,8 +105,9 @@ const normalizeVisit = (
     item.status === "temp_out" || item.status === "departed"
       ? item.status
       : "on_site";
+  const fields = mergeFields({ recordId, ...item });
   return {
-    ...mergeFields({ recordId, ...item }),
+    ...fields,
     status,
     checkinAt: String(item.checkinAt ?? "").trim() || nowIso(),
     tempOutAt: String(item.tempOutAt ?? "").trim() || undefined,
@@ -278,7 +288,7 @@ export const visitToRegisterRecord = (
   receptionistName: visit.receptionistName,
   plateNo: visit.plateNo,
   visitStartTime: visit.checkinAt,
-  visitEndTime: "",
+  visitEndTime: String(visit.visitEndTime ?? "").trim(),
   registerTime: visit.checkinAt,
 });
 

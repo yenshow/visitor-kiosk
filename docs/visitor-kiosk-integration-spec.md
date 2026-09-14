@@ -20,7 +20,9 @@
 
 ## 2. 業務流程
 
-首頁：**訪客報到**、**訪客簽退**、可關閉的**訪客預約**；統計「目前在場／臨時外出／今日離場」點擊開啟訪客紀錄（另可篩「全部／所有離場」）。預約可來自 YSCP Web 或現場 Kiosk；現場送出後不顯示密碼，待內部確認。
+首頁：**訪客報到**、**訪客簽退**、可關閉的**訪客預約**；統計「目前在場／臨時外出／今日離場」點擊開啟訪客紀錄（另可篩「全部／逾期在場／所有離場」；**逾期在場不顯示於首頁統計列**）。預約可來自 YSCP Web 或現場 Kiosk；現場送出後不顯示密碼，待內部確認。
+
+**查詢（單一輸入框）：** 8～15 碼純數字視為手機（整號比對，共乘可多人）；其餘視為 YSCP **4 碼**預約碼（僅精準比對 `appointCode` 或 `appointID`，不用 ID 後綴）。預約碼查在廠只鎖 `visitorId`，不以同手機帶出他人。逾期不自動 YSCP 簽退。
 
 ### 2.1 預約
 
@@ -47,15 +49,18 @@
 | 狀態 | 來源 |
 |------|------|
 | 待報到 | YSCP `appointStatus = 0`（首頁統計不顯示） |
-| on_site（目前在場） | YSCP 在廠、來訪結束時間未過、本機 visit 非 temp_out／departed（或僅 YSCP 在廠無本機列） |
-| temp_out（臨時外出） | YSCP 仍在廠、來訪結束時間未過，本機 `status=temp_out` |
+| on_site（目前在場） | 來訪結束時間未過、本機非 departed；且非逾期分類（見 overstay） |
+| temp_out（臨時外出） | 結束時間未過、本機 `status=temp_out` |
+| overstay（逾期在場） | 已過來訪結束時間仍 `on_site`／`temp_out`；或僅本機在場、無結束時間且已不在 YSCP 近期在廠清單。**不含**在「目前在場」計數；可簽退，UI 提示逾時 |
 | departed（已離場） | 正式簽退後本機累積；**首頁「今日離場」**僅計 `departedAt` 為台北今日；「所有離場／全部」含跨日 |
+
+報到成功時本機 visit 寫入 `visitEndTime`（與 YSCP 報到一致，通常為 `appointEndTime`）。
 
 車牌僅顯示；不另計場內車／外出車。
 
 ### 2.5 本機設定與紀錄
 
-`/setting` 無需登入：跑馬燈（空則寫死預設文案）、主題 `light`｜`dark`（cookie + `public/theme-init.js`）、logo（無則 `public/yenshow-logo.svg`）、`showAppoint`、**重置訪客統計**（刪全部 departed；temp_out→on_site；**保留** on_site 欄位；不批次 YSCP 簽退）。訪客紀錄：統計摘要＋明細（姓名／手機／車牌／公司／被訪人／時間），可篩全部／目前在場／臨時外出／今日離場／所有離場；不匯出。
+`/setting` 無需登入：跑馬燈（空則寫死預設文案）、主題 `light`｜`dark`（cookie + `public/theme-init.js`）、logo（無則 `public/yenshow-logo.svg`）、`showAppoint`、**重置訪客統計**（刪全部 departed；temp_out→on_site；**保留** on_site 欄位；不批次 YSCP 簽退）。訪客紀錄：統計摘要＋明細（姓名／手機／車牌／公司／被訪人／時間），可篩全部／目前在場／臨時外出／逾期在場／今日離場／所有離場；不匯出。
 
 本機主檔形狀：`{ visits: VisitorVisit[] }`（舊三陣列格式讀取時自動遷移）。
 
@@ -66,7 +71,7 @@
 | 方法 | 路徑 | 用途 |
 |------|------|------|
 | GET | `/api/kiosk/status` | 是否已設定 YSCP 金鑰 |
-| GET | `/api/kiosk/stats` | `{ onSite, tempOut, departed, departedTotal }`（departed＝今日離場） |
+| GET | `/api/kiosk/stats` | `{ onSite, tempOut, overstay, departed, departedTotal }`（departed＝今日離場） |
 | GET | `/api/kiosk/records` | 訪客紀錄 `{ summary, rows }`（含跨日離場；row 可含 `isDepartedToday`） |
 | POST | `/api/kiosk/records/reset` | 清 departed、取消 temp_out；保留 on_site |
 | GET / PUT | `/api/kiosk/settings` | 跑馬燈、主題、預約開關；Set-Cookie `theme` |

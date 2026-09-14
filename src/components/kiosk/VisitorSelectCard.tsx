@@ -47,15 +47,26 @@ export const VisitorSelectCard = ({
             ? formatDateTimeRange(item.visitStartTime, item.visitEndTime)
             : item.visitingTime || "—"}
         </div>
+        {item.isOverstay ? (
+          <p className="mt-2 text-sm font-semibold text-red-700">
+            已超過預約時間，請完成簽退
+          </p>
+        ) : null}
       </div>
       <span
         className={`shrink-0 rounded-full px-3 py-1 text-sm font-semibold ${
           item.presence === "temp_out"
             ? "bg-orange-100 text-orange-800"
-            : "bg-emerald-100 text-emerald-800"
+            : item.isOverstay
+              ? "bg-red-100 text-red-800"
+              : "bg-emerald-100 text-emerald-800"
         }`}
       >
-        {item.presence === "temp_out" ? "臨時外出" : "在場中"}
+        {item.presence === "temp_out"
+          ? "臨時外出"
+          : item.isOverstay
+            ? "逾時在場"
+            : "在場中"}
       </span>
     </div>
   </button>

@@ -42,8 +42,7 @@ export const matchesAppointmentQuery = (
 
   if (phoneNo && itemPhone === phoneNo) return true;
   if (!appointCode) return false;
-  if (code === appointCode || id === appointCode) return true;
-  return appointCode.length >= 3 && id.endsWith(appointCode);
+  return code === appointCode || id === appointCode;
 };
 
 /** 以預約號碼／密碼或手機查 YSCP；精準查無結果時改清單後端比對 */

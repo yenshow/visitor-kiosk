@@ -13,15 +13,16 @@ import {
   visitToRegisterRecord,
   type VisitorVisit,
 } from "@/lib/kiosk/presence";
+import { classifyActivePresence } from "@/lib/kiosk/presence-classify";
 import {
   flattenRegisterList,
-  isVisitNotEnded,
   type FlatRegisterRecord,
 } from "@/lib/kiosk/register-record";
 
 export type KioskStats = {
   onSite: number;
   tempOut: number;
+  overstay: number;
   /** 今日離場（台北日） */
   departed: number;
   /** 所有離場累計 */
@@ -31,9 +32,22 @@ export type KioskStats = {
 export type PresenceSnapshot = {
   onSitePeople: FlatRegisterRecord[];
   tempOutPeople: FlatRegisterRecord[];
+  overstayPeople: FlatRegisterRecord[];
   visitsById: Map<string, VisitorVisit>;
   departedAll: VisitorVisit[];
   departedToday: VisitorVisit[];
+};
+
+const pushByBucket = (
+  bucket: ReturnType<typeof classifyActivePresence>,
+  flat: FlatRegisterRecord,
+  onSite: FlatRegisterRecord[],
+  tempOut: FlatRegisterRecord[],
+  overstay: FlatRegisterRecord[],
+) => {
+  if (bucket === "overstay") overstay.push(flat);
+  else if (bucket === "temp_out") tempOut.push(flat);
+  else if (bucket === "on_site") onSite.push(flat);
 };
 
 /** YSCP 在廠 + 本機 on_site／temp_out（補齊 YSCP 延遲） */
@@ -47,38 +61,41 @@ export const loadPresenceSnapshot = async (): Promise<PresenceSnapshot> => {
   const visitsById = new Map(
     store.visits.map((item) => [item.recordId, item]),
   );
-  const activeList = enrichRegisterList(
+  const enrichedList = enrichRegisterList(
     flattenRegisterList(registerPayload.list),
     appointPayload.list,
     store.visits,
-  ).filter((item) => isVisitNotEnded(item.visitEndTime));
+  );
 
   const onSitePeople: FlatRegisterRecord[] = [];
   const tempOutPeople: FlatRegisterRecord[] = [];
+  const overstayPeople: FlatRegisterRecord[] = [];
   const listedIds = new Set<string>();
 
-  for (const item of activeList) {
-    const status = visitsById.get(item.recordId)?.status;
-    if (status === "departed") continue;
-    if (status === "temp_out") {
-      tempOutPeople.push(item);
-    } else {
-      onSitePeople.push(item);
-    }
+  for (const item of enrichedList) {
+    const visit = visitsById.get(item.recordId);
+    const bucket = classifyActivePresence({
+      visit,
+      flat: item,
+      inYscpRegisterList: true,
+    });
+    if (!bucket) continue;
+    pushByBucket(bucket, item, onSitePeople, tempOutPeople, overstayPeople);
     listedIds.add(item.recordId);
   }
 
   for (const visit of store.visits) {
     if (listedIds.has(visit.recordId)) continue;
-    if (visit.status === "on_site") {
-      onSitePeople.push(visitToRegisterRecord(visit));
-      listedIds.add(visit.recordId);
-      continue;
-    }
-    if (visit.status === "temp_out") {
-      tempOutPeople.push(visitToRegisterRecord(visit));
-      listedIds.add(visit.recordId);
-    }
+    if (visit.status !== "on_site" && visit.status !== "temp_out") continue;
+    const flat = visitToRegisterRecord(visit);
+    const bucket = classifyActivePresence({
+      visit,
+      flat,
+      inYscpRegisterList: false,
+    });
+    if (!bucket) continue;
+    pushByBucket(bucket, flat, onSitePeople, tempOutPeople, overstayPeople);
+    listedIds.add(visit.recordId);
   }
 
   const departedAll = store.visits.filter(
@@ -88,6 +105,7 @@ export const loadPresenceSnapshot = async (): Promise<PresenceSnapshot> => {
   return {
     onSitePeople,
     tempOutPeople,
+    overstayPeople,
     visitsById,
     departedAll,
     departedToday: departedAll.filter((item) => isDepartedToday(item)),
@@ -97,6 +115,7 @@ export const loadPresenceSnapshot = async (): Promise<PresenceSnapshot> => {
 export const statsFromSnapshot = (snap: PresenceSnapshot): KioskStats => ({
   onSite: snap.onSitePeople.length,
   tempOut: snap.tempOutPeople.length,
+  overstay: snap.overstayPeople.length,
   departed: snap.departedToday.length,
   departedTotal: snap.departedAll.length,
 });

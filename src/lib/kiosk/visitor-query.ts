@@ -17,6 +17,8 @@ export type OnSiteRecordView = {
   visitStartTime: string;
   visitEndTime: string;
   visitingTime?: string;
+  /** 已超過預約／來訪截止時間 */
+  isOverstay?: boolean;
 };
 
 export type VisitorQueryInput = {
