@@ -49,7 +49,7 @@ type OrgListPayload = {
 };
 
 /** 分頁取得全部部門（官方 orgList） */
-export const listAllOrgs = async (): Promise<OrgNode[]> => {
+const listAllOrgs = async (): Promise<OrgNode[]> => {
   const path = "/artemis/api/resource/v1/org/orgList";
   const pageSize = 500;
   let pageNo = 1;
@@ -79,7 +79,7 @@ export const listAllOrgs = async (): Promise<OrgNode[]> => {
 let orgCache: { at: number; orgs: OrgNode[] } | null = null;
 const ORG_CACHE_MS = 60_000;
 
-export const listAllOrgsCached = async (): Promise<OrgNode[]> => {
+const listAllOrgsCached = async (): Promise<OrgNode[]> => {
   if (orgCache && Date.now() - orgCache.at < ORG_CACHE_MS) {
     return orgCache.orgs;
   }

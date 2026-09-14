@@ -4,7 +4,7 @@ import { useState } from "react";
 import { FlowCard } from "@/components/kiosk/FlowCard";
 import { IdleCountdown } from "@/components/kiosk/IdleCountdown";
 import { HostPicker, type HostPerson } from "@/components/kiosk/HostPicker";
-import { normalizePlateNo } from "@/lib/kiosk/plate";
+import { normalizePlateNo } from "@/lib/kiosk/normalize";
 import { isValidEmail } from "@/lib/kiosk/visitor-fields";
 import { VISIT_REASON_OPTIONS } from "@/lib/kiosk/visit-reason";
 

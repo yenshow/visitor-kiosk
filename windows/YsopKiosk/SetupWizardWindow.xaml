@@ -1,0 +1,123 @@
+<Window x:Class="YsopKiosk.SetupWizardWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="YSCP 設定"
+        Width="720"
+        SizeToContent="Height"
+        MinWidth="640"
+        MaxHeight="900"
+        WindowStartupLocation="CenterOwner"
+        FontSize="14"
+        ResizeMode="NoResize"
+        Background="{StaticResource ShellGradientBrush}"
+        Foreground="{StaticResource TextPrimaryBrush}">
+  <StackPanel Margin="20">
+    <TextBlock Text="YSCP 設定" FontSize="20" FontWeight="SemiBold"
+               Foreground="{StaticResource TextPrimaryBrush}"/>
+    <TextBlock x:Name="TxtHint" FontSize="13" Margin="0,3,0,14"
+               Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"
+               Text="填寫連線、Webhook、出口車道後套用（寫入 .env 並自動訂閱事件）。"/>
+
+    <!-- 連線 -->
+    <Border Padding="14,12" Margin="0,0,0,12"
+            Background="{StaticResource CardBackgroundBrush}"
+            BorderBrush="{StaticResource CardBorderBrush}"
+            BorderThickness="1" CornerRadius="10">
+      <StackPanel>
+        <TextBlock Style="{StaticResource SectionHeader}" Text="連線"/>
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="72"/>
+            <ColumnDefinition Width="*"/>
+          </Grid.ColumnDefinitions>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+          </Grid.RowDefinitions>
+          <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource FormLabel}"
+                     VerticalAlignment="Center" Text="HOST"/>
+          <TextBox Grid.Row="0" Grid.Column="1" x:Name="TxtHost"
+                   Style="{StaticResource ThemedTextBox}" Margin="0,0,0,8"/>
+          <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource FormLabel}"
+                     VerticalAlignment="Center" Text="AK"/>
+          <TextBox Grid.Row="1" Grid.Column="1" x:Name="TxtAk"
+                   Style="{StaticResource ThemedTextBox}" Margin="0,0,0,8"/>
+          <TextBlock Grid.Row="2" Grid.Column="0" Style="{StaticResource FormLabel}"
+                     VerticalAlignment="Center" Text="SK"/>
+          <TextBox Grid.Row="2" Grid.Column="1" x:Name="TxtSk"
+                   Style="{StaticResource ThemedTextBox}"/>
+        </Grid>
+      </StackPanel>
+    </Border>
+
+    <!-- Webhook -->
+    <Border Padding="14,12" Margin="0,0,0,12"
+            Background="{StaticResource CardBackgroundBrush}"
+            BorderBrush="{StaticResource CardBorderBrush}"
+            BorderThickness="1" CornerRadius="10">
+      <StackPanel>
+        <TextBlock Style="{StaticResource SectionHeader}" Text="事件 Webhook"/>
+        <TextBlock Style="{StaticResource FormHint}"
+                   Text="範本：http://本機區網IP:3010/api/yscp/events（YSCP 須能連到，請用 http）"/>
+        <TextBox x:Name="TxtEventDest" Style="{StaticResource ThemedTextBox}" Margin="0,8,0,0"/>
+      </StackPanel>
+    </Border>
+
+    <!-- 出口車道 -->
+    <Border Padding="14,12"
+            Background="{StaticResource CardBackgroundBrush}"
+            BorderBrush="{StaticResource CardBorderBrush}"
+            BorderThickness="1" CornerRadius="10">
+      <StackPanel>
+        <TextBlock Style="{StaticResource SectionHeader}" Text="出口車道"/>
+        <TextBlock Style="{StaticResource FormHint}" Margin="0,0,0,10"
+                       Text="載入裝置後選出口 LPR 與繼電器並加入列表。"/>
+
+        <Button x:Name="BtnLoadDevices" Content="載入出口相機／繼電器"
+                HorizontalAlignment="Left" MinWidth="180"
+                Style="{StaticResource PrimaryButton}" Margin="0,0,0,10"
+                Click="OnLoadDevices"/>
+
+        <Grid Margin="0,0,0,10">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="12"/>
+            <ColumnDefinition Width="*"/>
+          </Grid.ColumnDefinitions>
+          <StackPanel Grid.Column="0">
+            <TextBlock Style="{StaticResource FormLabel}" Text="出口 LPR"/>
+            <ListBox x:Name="ListCams" Style="{StaticResource ThemedListBox}"
+                     Height="112" Margin="0,4,0,0" SelectionChanged="OnCamSelected"/>
+          </StackPanel>
+          <StackPanel Grid.Column="2">
+            <TextBlock Style="{StaticResource FormLabel}" Text="繼電器"/>
+            <ListBox x:Name="ListRelays" Style="{StaticResource ThemedListBox}"
+                     Height="112" Margin="0,4,0,0"/>
+          </StackPanel>
+        </Grid>
+
+        <WrapPanel Margin="0,0,0,12">
+          <Button Content="加入此組車道" MinWidth="128"
+                  Style="{StaticResource PrimaryButton}" Click="OnAddLane"/>
+          <Button Content="清除已加入" MinWidth="120" Click="OnClearLanes"/>
+        </WrapPanel>
+
+        <TextBlock Style="{StaticResource FormLabel}" Text="已加入的出口車道"/>
+        <Border Margin="0,6,0,0" Padding="12,10" MinHeight="56" CornerRadius="6"
+                Background="{StaticResource StatusBackgroundBrush}"
+                BorderBrush="{StaticResource DividerBrush}" BorderThickness="1">
+          <TextBlock x:Name="TxtLanes" TextWrapping="Wrap" LineHeight="20"
+                     Foreground="{StaticResource TextPrimaryBrush}"
+                     Text="尚未加入車道。"/>
+        </Border>
+      </StackPanel>
+    </Border>
+
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
+      <Button x:Name="BtnApply" Content="套用" MinWidth="100"
+              Style="{StaticResource PrimaryButton}" Click="OnApply"/>
+      <Button Content="取消" MinWidth="100" Click="OnCancel"/>
+    </StackPanel>
+  </StackPanel>
+</Window>

@@ -7,7 +7,10 @@
     "build": "next build",
     "start": "next start --port 3010",
     "lint": "eslint",
-    "setup:yscp": "tsx scripts/yscp-setup.ts"
+    "setup:yscp": "tsx scripts/yscp-setup.ts",
+    "build:yscp-bridge": "esbuild scripts/yscp-bridge.ts --bundle --platform=node --format=cjs --outfile=tools/yscp-bridge.cjs",
+    "pack": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/pack-portable.ps1",
+    "pack:portable": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/pack-portable.ps1"
   },
   "dependencies": {
     "next": "16.3.4",
@@ -25,6 +28,7 @@
     "eslint-config-next": "16.3.4",
     "tailwindcss": "^4",
     "tsx": "^4.23.13",
-    "typescript": "^5"
+    "typescript": "^5",
+    "esbuild": "^0.25.0"
   }
 }

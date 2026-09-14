@@ -9,8 +9,7 @@ import {
   toTaipeiDateKey,
 } from "@/lib/kiosk/api-helpers";
 import { notifyApproversOfPendingAppointment } from "@/lib/kiosk/approver-mail";
-import { normalizePlateNo } from "@/lib/kiosk/plate";
-import { normalizePhoneDigits } from "@/lib/kiosk/phone";
+import { normalizePhoneDigits, normalizePlateNo } from "@/lib/kiosk/normalize";
 import { isValidEmail } from "@/lib/kiosk/visitor-fields";
 
 type AppointBody = {

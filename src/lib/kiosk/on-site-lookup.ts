@@ -1,8 +1,7 @@
 import { findAppointmentsByQuery } from "@/lib/kiosk/appoint-lookup";
 import { getVisitQueryRangeTaipei } from "@/lib/kiosk/api-helpers";
 import { enrichRegisterList } from "@/lib/kiosk/appoint-enrichment";
-import { normalizePlateNo } from "@/lib/kiosk/plate";
-import { normalizePhoneDigits } from "@/lib/kiosk/phone";
+import { normalizePhoneDigits, normalizePlateNo } from "@/lib/kiosk/normalize";
 import {
   getVisitStore,
   visitToRegisterRecord,
@@ -135,13 +134,16 @@ export const lookupOnSiteRecords = async (input: {
       .map((item) => String(item.visitorInfo?.visitorId ?? "").trim())
       .filter(Boolean),
   );
+  // 僅在使用者「以手機查詢」時才用手機比對在廠記錄；預約碼查詢只應鎖定 visitorId，避免同號多人
   const filterPhones = new Set(
-    [
-      phoneNo,
-      ...appointList.map((item) =>
-        normalizePhoneDigits(item.visitorInfo?.phoneNo ?? ""),
-      ),
-    ].filter(Boolean),
+    phoneNo
+      ? [
+          phoneNo,
+          ...appointList.map((item) =>
+            normalizePhoneDigits(item.visitorInfo?.phoneNo ?? ""),
+          ),
+        ].filter(Boolean)
+      : [],
   );
 
   const store = await getVisitStore();

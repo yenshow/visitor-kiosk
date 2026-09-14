@@ -107,7 +107,7 @@ export default function HomePage() {
     <>
       <ThemeSync theme={settings?.theme} />
       <KioskShell
-        hasCredentials={status?.hasCredentials ?? true}
+        hasCredentials={status == null ? true : status.hasCredentials}
         layout={screen === "home" ? "home" : "flow"}
         marquee={settings?.resolvedMarquee || DEFAULT_MARQUEE}
         logoUrl={settings?.logoUrl || "/yenshow-logo.svg"}

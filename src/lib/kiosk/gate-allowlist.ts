@@ -1,6 +1,6 @@
 import { getConfig } from "@/lib/config";
 import { exitCandidates, getVisitStore } from "@/lib/kiosk/presence";
-import { normalizePlateNo } from "@/lib/kiosk/plate";
+import { normalizePlateNo } from "@/lib/kiosk/normalize";
 
 export type ExitAllowReason = "temp_out" | "departed";
 

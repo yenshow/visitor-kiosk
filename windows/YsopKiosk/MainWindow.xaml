@@ -1,0 +1,65 @@
+<Window x:Class="YsopKiosk.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:YsopKiosk"
+        Title="{x:Static local:AppBrand.ProductName}"
+        Width="620"
+        SizeToContent="Height"
+        MinWidth="560"
+        WindowStartupLocation="CenterScreen"
+        FontSize="14"
+        ResizeMode="NoResize"
+        Background="{StaticResource ShellGradientBrush}"
+        Foreground="{StaticResource TextPrimaryBrush}"
+        Closing="OnClosing">
+  <StackPanel Margin="20">
+    <TextBlock FontSize="20" FontWeight="SemiBold"
+               Foreground="{StaticResource TextPrimaryBrush}"
+               Text="{x:Static local:AppBrand.ProductName}"/>
+    <TextBlock FontSize="13" Margin="0,3,0,0"
+               Foreground="{StaticResource TextPrimaryBrush}"
+               Text="{x:Static local:AppBrand.RoleTitle}"/>
+    <TextBlock FontSize="13" Margin="0,3,0,14"
+               Foreground="{StaticResource TextMutedBrush}"
+               Text="先完成 YSCP 設定，再啟動運行 · 關閉視窗後仍在系統匣"/>
+
+    <Border Background="{StaticResource StatusBackgroundBrush}"
+            BorderBrush="{StaticResource DividerBrush}" BorderThickness="1"
+            CornerRadius="6" Padding="12,9" Margin="0,0,0,12">
+      <TextBlock x:Name="TxtStatus" FontSize="13" FontWeight="SemiBold"
+                 TextWrapping="Wrap" Text="偵測中…"
+                 Foreground="{StaticResource TextPrimaryBrush}"/>
+    </Border>
+
+    <Border Margin="0,0,0,12" Padding="14,12"
+            Background="{StaticResource CardBackgroundBrush}"
+            BorderBrush="{StaticResource CardBorderBrush}"
+            BorderThickness="1" CornerRadius="10">
+      <StackPanel>
+        <TextBlock Style="{StaticResource SectionHeader}" Text="1. YSCP 設定"/>
+        <TextBlock Style="{StaticResource FormHint}"
+                   Text="初次或換機：連線金鑰、Webhook、出口車道。"/>
+        <Button Content="開啟 YSCP 設定…" Margin="0,10,0,0"
+                HorizontalAlignment="Left" MinWidth="180"
+                Style="{StaticResource PrimaryButton}" Click="OnOpenWizard"/>
+      </StackPanel>
+    </Border>
+
+    <Border Padding="14,12"
+            Background="{StaticResource CardBackgroundBrush}"
+            BorderBrush="{StaticResource CardBorderBrush}"
+            BorderThickness="1" CornerRadius="10">
+      <StackPanel>
+        <TextBlock Style="{StaticResource SectionHeader}" Text="2. 運行"/>
+        <TextBlock Style="{StaticResource FormHint}"
+                   Text="設定完成後啟動服務。"/>
+        <WrapPanel Margin="0,10,0,0">
+          <Button x:Name="BtnStartKiosk" Content="啟動服務" MinWidth="128"
+                  Style="{StaticResource PrimaryButton}" Click="OnStartKiosk"/>
+          <Button x:Name="BtnStop" Content="停止服務" MinWidth="120" Click="OnStop"/>
+          <Button x:Name="BtnSetting" Content="服務設定" MinWidth="128" Click="OnOpenSetting"/>
+        </WrapPanel>
+      </StackPanel>
+    </Border>
+  </StackPanel>
+</Window>

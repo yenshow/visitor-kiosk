@@ -1,11 +1,10 @@
 import type { AppointmentItem } from "@/lib/yscp/visitor-api";
-import { normalizePhoneDigits } from "@/lib/kiosk/phone";
-import { normalizePlateNo } from "@/lib/kiosk/plate";
+import { normalizePhoneDigits, normalizePlateNo } from "@/lib/kiosk/normalize";
 import type { VisitorVisit } from "@/lib/kiosk/presence";
 import type { FlatRegisterRecord } from "@/lib/kiosk/register-record";
 import { displayVisitorName } from "@/lib/kiosk/visitor-fields";
 
-export type AppointEnrichment = {
+type AppointEnrichment = {
   visitorId: string;
   phoneNo: string;
   visitorName: string;
@@ -24,7 +23,7 @@ const rankAppointments = (list: AppointmentItem[]): AppointmentItem[] =>
     return String(b.appointID ?? "").localeCompare(String(a.appointID ?? ""));
   });
 
-export const buildAppointEnrichmentIndex = (list: AppointmentItem[]) => {
+const buildAppointEnrichmentIndex = (list: AppointmentItem[]) => {
   const byVisitorId = new Map<string, AppointEnrichment>();
   const byPhone = new Map<string, AppointEnrichment>();
 
@@ -57,7 +56,7 @@ export const buildAppointEnrichmentIndex = (list: AppointmentItem[]) => {
   return { byVisitorId, byPhone };
 };
 
-export const findAppointEnrichment = (
+const findAppointEnrichment = (
   index: ReturnType<typeof buildAppointEnrichmentIndex>,
   flat: Pick<FlatRegisterRecord, "visitorId" | "phoneNo">,
 ): AppointEnrichment | null => {
@@ -71,7 +70,7 @@ export const findAppointEnrichment = (
 };
 
 /** visit 完整欄位 > 在廠紀錄 > 預約補齊 */
-export const mergeRegisterFields = (
+const mergeRegisterFields = (
   flat: FlatRegisterRecord,
   options?: {
     enrich?: AppointEnrichment | null;

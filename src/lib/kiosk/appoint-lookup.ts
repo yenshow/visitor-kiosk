@@ -3,8 +3,7 @@ import {
   type AppointmentItem,
 } from "@/lib/yscp/visitor-api";
 import { getAppointQueryRangeTaipei } from "@/lib/kiosk/api-helpers";
-import { normalizePhoneDigits } from "@/lib/kiosk/phone";
-import { normalizePlateNo } from "@/lib/kiosk/plate";
+import { normalizePhoneDigits, normalizePlateNo } from "@/lib/kiosk/normalize";
 
 const mergeByAppointId = (lists: AppointmentItem[][]): AppointmentItem[] => {
   const map = new Map<string, AppointmentItem>();

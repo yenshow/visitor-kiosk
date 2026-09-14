@@ -5,8 +5,7 @@ import {
   toTaipeiDateKey,
   toTaipeiIso,
 } from "@/lib/kiosk/api-helpers";
-import { normalizePlateNo } from "@/lib/kiosk/plate";
-import { normalizePhoneDigits } from "@/lib/kiosk/phone";
+import { normalizePhoneDigits, normalizePlateNo } from "@/lib/kiosk/normalize";
 import type { FlatRegisterRecord } from "@/lib/kiosk/register-record";
 import { displayVisitorName } from "@/lib/kiosk/visitor-fields";
 

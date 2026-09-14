@@ -1,4 +1,4 @@
-import { looksLikePhone, normalizePhoneDigits } from "@/lib/kiosk/phone";
+import { looksLikePhone, normalizePhoneDigits } from "@/lib/kiosk/normalize";
 
 export type OnSitePresence = "on_site" | "temp_out";
 

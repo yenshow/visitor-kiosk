@@ -39,12 +39,6 @@ export const taipeiDateKeyFromIso = (value: string): string => {
   return toTaipeiDateKey(new Date(ms));
 };
 
-export const isSameTaipeiDate = (a: string, b: string): boolean => {
-  const da = taipeiDateKeyFromIso(a);
-  const db = taipeiDateKeyFromIso(b);
-  return Boolean(da && db && da === db);
-};
-
 /**
  * 報到查預約時段：前 30 日～後 30 日。
  * YSCP appointmentlist 必填時段；提早預約只要「來訪日」落在此窗口即可查到。

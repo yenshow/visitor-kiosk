@@ -38,7 +38,7 @@ const buildTextBody = (payload: ApproverMailPayload): string => {
   );
   const reason = visitReasonLabel(payload.visitReasonType);
   const lines = [
-    "此為訪客服務機（YSOP）現場預約通知。",
+    "此為 YSOP Kiosk 訪客系統現場預約通知。",
     "預約已寫入 YSCP，請至 YSCP 訪客預約功能完成核准。",
     "（本信不含預約密碼；密碼請於核准後由 YSCP 提供給訪客。）",
     "",

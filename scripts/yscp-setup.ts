@@ -3,8 +3,7 @@
  *   npm run setup:yscp              首次／完整設定
  *   npm run setup:yscp -- <command> 重跑單一步驟
  */
-import { copyFileSync, existsSync, readFileSync, renameSync, writeFileSync } from "fs";
-import os from "os";
+import { existsSync } from "fs";
 import path from "path";
 import { createInterface } from "readline";
 import { fileURLToPath } from "url";
@@ -23,39 +22,15 @@ import {
   type YscpAlarmOutput,
   type YscpCamera,
 } from "../src/lib/yscp/exit-gate";
+import {
+  listLanIps,
+  loadDotEnv,
+  upsertEnvLine as writeEnv,
+  writeUtf8,
+} from "./env-file";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const ENV_PATH = path.join(ROOT, ".env");
-const ENV_EXAMPLE_PATH = path.join(ROOT, ".env.example");
-
-/** Node UTF-8 讀寫，避免 Windows PowerShell 系統碼頁弄亂中文 */
-const readUtf8 = (filePath: string): string =>
-  readFileSync(filePath, "utf8").replace(/^\uFEFF/, "");
-
-const writeUtf8 = (filePath: string, text: string) => {
-  const tmp = `${filePath}.tmp`;
-  writeFileSync(tmp, text.replace(/^\uFEFF/, ""), { encoding: "utf8" });
-  renameSync(tmp, filePath);
-};
-
-const loadDotEnv = (filePath: string) => {
-  if (!existsSync(filePath)) return;
-  for (const raw of readUtf8(filePath).split(/\r?\n/)) {
-    const line = raw.trim();
-    if (!line || line.startsWith("#")) continue;
-    const eq = line.indexOf("=");
-    if (eq <= 0) continue;
-    const key = line.slice(0, eq).trim();
-    let value = line.slice(eq + 1).trim();
-    if (
-      (value.startsWith('"') && value.endsWith('"')) ||
-      (value.startsWith("'") && value.endsWith("'"))
-    ) {
-      value = value.slice(1, -1);
-    }
-    if (!process.env[key]) process.env[key] = value;
-  }
-};
 
 const usage = () => {
   console.log(`
@@ -120,38 +95,13 @@ const askOrKeep = async (label: string, current: string, secret = false) => {
   return answer;
 };
 
-const upsertEnvLine = (key: string, value: string) => {
-  const line = `${key}=${value}`;
-  let text = existsSync(ENV_PATH) ? readUtf8(ENV_PATH) : "";
-  const re = new RegExp(`^${key}=.*$`, "m");
-  text = re.test(text)
-    ? text.replace(re, line)
-    : `${text.replace(/\s*$/, "")}\n${line}\n`;
-  writeUtf8(ENV_PATH, text);
-  process.env[key] = value;
-};
+const upsertEnvLine = (key: string, value: string) =>
+  writeEnv(ENV_PATH, key, value);
 
 const ensureEnvFile = () => {
   if (existsSync(ENV_PATH)) return;
-  if (!existsSync(ENV_EXAMPLE_PATH)) {
-    writeUtf8(ENV_PATH, "");
-    return;
-  }
-  copyFileSync(ENV_EXAMPLE_PATH, ENV_PATH);
-  console.log(`[+] 已從 .env.example 建立 ${ENV_PATH}`);
-};
-
-const listLanIps = (): string[] => {
-  const ips: string[] = [];
-  for (const addrs of Object.values(os.networkInterfaces())) {
-    for (const addr of addrs ?? []) {
-      const family = String(addr.family);
-      if (family !== "IPv4" && family !== "4") continue;
-      if (addr.internal) continue;
-      ips.push(addr.address);
-    }
-  }
-  return ips;
+  writeUtf8(ENV_PATH, "");
+  console.log(`[+] 已建立空白 ${ENV_PATH}`);
 };
 
 const printCams = (cams: YscpCamera[], detail: boolean) => {

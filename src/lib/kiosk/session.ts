@@ -82,6 +82,17 @@ export const createCheckoutToken = (
   return token;
 };
 
+const toCheckoutPayload = (
+  entry: CheckoutSessionEntry,
+): CheckoutSessionPayload => ({
+  appointRecordId: entry.appointRecordId,
+  visitorName: entry.visitorName,
+  plateNo: entry.plateNo,
+  phoneNo: entry.phoneNo,
+  companyName: entry.companyName,
+  receptionistName: entry.receptionistName,
+});
+
 export const consumeCheckoutToken = (
   token: string,
 ): CheckoutSessionPayload | null => {
@@ -90,8 +101,7 @@ export const consumeCheckoutToken = (
   const entry = store.get(token);
   if (!entry) return null;
   store.delete(token);
-  const { expiresAt: _, ...payload } = entry;
-  return payload;
+  return toCheckoutPayload(entry);
 };
 
 export const peekCheckoutToken = (
@@ -101,6 +111,5 @@ export const peekCheckoutToken = (
   prune(store);
   const entry = store.get(token);
   if (!entry) return null;
-  const { expiresAt: _, ...payload } = entry;
-  return payload;
+  return toCheckoutPayload(entry);
 };

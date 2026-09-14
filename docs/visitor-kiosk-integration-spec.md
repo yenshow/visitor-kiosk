@@ -1,15 +1,15 @@
-# 訪客服務機 × YSCP 整合規格
+# YSOP Kiosk × YSCP 整合規格
 
-獨立訪客服務機（**YSOP**）後端代理對接 Yenshow Central Professional（**YSCP**）Artemis OpenAPI。前端不可直打 Artemis。
+獨立訪客機（**YSOP Kiosk**）後端代理對接 Yenshow Central Professional（**YSCP**）Artemis OpenAPI。前端不可直打 Artemis。
 
-入場車牌時段由 YSCP 在預約核准後下發；YSOP **不**控入場開閘、**不能**提早作廢入口權限。出場：簽退／臨時外出寫本機名單 → 出口 LPR 事件 → YSOP 開閘。
+入場車牌時段由 YSCP 在預約核准後下發；YSOP Kiosk **不**控入場開閘、**不能**提早作廢入口權限。出場：簽退／臨時外出寫本機名單 → 出口 LPR 事件 → Kiosk 開閘。
 
 設定與環境變數見 [env-setup.md](./env-setup.md)。
 
 ## 1. 架構
 
 ```
-[ YSOP 前端 ]  →  [ /api/kiosk/* ]  →  [ YSCP Artemis HTTPS ]
+[ YSOP Kiosk 前端 ]  →  [ /api/kiosk/* ]  →  [ YSCP Artemis HTTPS ]
 [ 出口 LPR ]   →  [ YSCP 事件推送 ]  →  [ /api/yscp/events ] → 名單比對 → alarmOutput 開閘
 ```
 

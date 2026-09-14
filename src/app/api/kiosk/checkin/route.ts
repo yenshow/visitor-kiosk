@@ -1,13 +1,12 @@
 import { reapplyAuth, registerCheckIn } from "@/lib/yscp/visitor-api";
 import { jsonError, jsonOk, toTaipeiIso } from "@/lib/kiosk/api-helpers";
-import { normalizePlateNo } from "@/lib/kiosk/plate";
-import { normalizePhoneDigits } from "@/lib/kiosk/phone";
+import { normalizePhoneDigits, normalizePlateNo } from "@/lib/kiosk/normalize";
+import { upsertVisitOnCheckin } from "@/lib/kiosk/presence";
 import {
   consumeCheckinToken,
   peekCheckinToken,
 } from "@/lib/kiosk/session";
 import { displayVisitorName } from "@/lib/kiosk/visitor-fields";
-import { recordVisitorAfterCheckin } from "@/lib/kiosk/visitor-record";
 
 type CheckinBody = {
   acceptedNotice?: boolean;
@@ -60,7 +59,7 @@ export const POST = async (request: Request) => {
 
     consumeCheckinToken(token);
 
-    await recordVisitorAfterCheckin({
+    await upsertVisitOnCheckin({
       recordId: String(result.appointRecordId ?? "").trim(),
       visitorId,
       visitorName: displayVisitorName(

@@ -66,8 +66,8 @@ export const KioskShell = ({
             className="rounded-2xl border border-red-300/70 bg-red-950/40 px-4 py-3 text-center text-base text-red-100"
             role="alert"
           >
-            尚未設定連線金鑰，無法連線 YSCP。請在 `.env` 填入 OpenAPI
-            金鑰後重啟服務。
+            尚未設定連線金鑰，無法連線 YSCP。請開啟「YSOP Kiosk
+            訪客系統」完成 YSCP 設定。
           </div>
         ) : null}
 

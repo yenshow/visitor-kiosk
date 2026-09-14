@@ -1,19 +1,18 @@
-# 訪客服務機（YSOP / Visitor Kiosk）
+# YSOP Kiosk 訪客系統
 
-獨立訪客**預約／報到／簽退** Web 平台。後端代理對接 Yenshow Central Professional（**YSCP**）Artemis OpenAPI；可選出口 LPR 事件驅動開閘。
+獨立訪客**預約／報到／簽退** Kiosk。後端代理對接 Yenshow Central Professional（**YSCP**）Artemis OpenAPI；可選出口 LPR 事件驅動開閘。
 
-## 快速開始
+## 快速開始（安裝檔）
 
 ```bash
-copy .env.example .env
 npm install --legacy-peer-deps --cache ./.npm-cache
-npm run setup:yscp
-npm run dev
+npm run pack
 ```
 
-瀏覽器開啟 http://localhost:3010。生產：`npm run start`（同樣埠 **3010**）。
+需求：Node.js／npm、**.NET 8 SDK**、[Inno Setup 6](https://jrsoftware.org/isinfo.php)。
 
-- YSCP 設定（HOST／金鑰／Webhook／出口車道）：[docs/env-setup.md](docs/env-setup.md)
-- 流程、Kiosk API、Artemis：[docs/visitor-kiosk-integration-spec.md](docs/visitor-kiosk-integration-spec.md)
+產出 `dist/YSOP-Kiosk-setup.exe`（圖示 `installer/assets/YSOP.ico`）。現場執行安裝檔後，用桌面「YSOP Kiosk」捷徑（圖示 `kiosk.ico`）完成 YSCP 設定再「啟動訪客機」。
 
-本機畫面設定在 `/setting`（跑馬燈、主題、logo、是否顯示預約、重置訪客統計），寫入 `data/`。`.env` 勿打包進公開發佈物。
+說明：[docs/env-setup.md](docs/env-setup.md)。流程／API：[docs/visitor-kiosk-integration-spec.md](docs/visitor-kiosk-integration-spec.md)。
+
+本機開發可另跑 `npm run setup:yscp`（只寫專案根 `.env`，不進封裝）。

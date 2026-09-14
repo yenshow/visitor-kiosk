@@ -1,0 +1,11 @@
+<Window x:Class="YsopKiosk.SettingWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+        Title="YSOP Kiosk 畫面設定"
+        Width="960" Height="720"
+        MinWidth="720" MinHeight="520"
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource ShellGradientBrush}">
+  <wv2:WebView2 x:Name="WebView" Margin="0"/>
+</Window>

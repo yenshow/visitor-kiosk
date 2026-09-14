@@ -6,8 +6,7 @@ import {
 } from "@/lib/kiosk/appoint-lookup";
 import { jsonError, jsonOk } from "@/lib/kiosk/api-helpers";
 import { lookupOnSiteRecords } from "@/lib/kiosk/on-site-lookup";
-import { normalizePlateNo } from "@/lib/kiosk/plate";
-import { normalizePhoneDigits } from "@/lib/kiosk/phone";
+import { normalizePhoneDigits, normalizePlateNo } from "@/lib/kiosk/normalize";
 import { createCheckinToken } from "@/lib/kiosk/session";
 import { displayVisitorName } from "@/lib/kiosk/visitor-fields";
 import {

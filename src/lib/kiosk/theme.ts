@@ -18,13 +18,6 @@ export const writeThemeCookie = (theme: KioskTheme) => {
   document.cookie = `${THEME_COOKIE}=${encodeURIComponent(theme)}; path=/; max-age=${maxAge}; SameSite=Lax`;
 };
 
-export const readThemeCookie = (): KioskTheme | null => {
-  if (typeof document === "undefined") return null;
-  const match = document.cookie.match(/(?:^|;\s*)theme=([^;]*)/);
-  if (!match) return null;
-  return normalizeTheme(decodeURIComponent(match[1] ?? ""));
-};
-
 export const themeCookieHeader = (theme: KioskTheme): string => {
   const maxAge = 60 * 60 * 24 * 365;
   return `${THEME_COOKIE}=${encodeURIComponent(theme)}; Path=/; Max-Age=${maxAge}; SameSite=Lax`;

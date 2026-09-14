@@ -1,5 +1,5 @@
 import type { VisitorRegisterRecord } from "@/lib/yscp/visitor-api";
-import { normalizePlateNo } from "@/lib/kiosk/plate";
+import { normalizePlateNo } from "@/lib/kiosk/normalize";
 import { displayVisitorName } from "@/lib/kiosk/visitor-fields";
 
 export type FlatRegisterRecord = {
@@ -35,7 +35,7 @@ const pickText = (
 };
 
 /** YSCP 在廠記錄扁平化（欄位多在 visitorBaseInfo） */
-export const flattenRegisterRecord = (
+const flattenRegisterRecord = (
   raw: unknown,
 ): FlatRegisterRecord | null => {
   const root = asRecord(raw);

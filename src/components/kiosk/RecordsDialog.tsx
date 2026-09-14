@@ -105,9 +105,15 @@ export const RecordsDialog = ({
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
 
-  useEffect(() => {
+  const handleFilterChange = (next: RecordsFilter) => {
+    setFilter(next);
     setPage(1);
-  }, [filter, search]);
+  };
+
+  const handleSearchChange = (value: string) => {
+    setSearch(value);
+    setPage(1);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -254,7 +260,7 @@ export const RecordsDialog = ({
                         ? "border-blue-600 bg-blue-600 text-white"
                         : "border-slate-300 bg-white text-slate-700 active:bg-slate-50"
                     }`}
-                    onClick={() => setFilter(opt.value)}
+                    onClick={() => handleFilterChange(opt.value)}
                   >
                     {opt.label}
                   </button>
@@ -269,7 +275,7 @@ export const RecordsDialog = ({
                 type="search"
                 className="min-h-12 w-full rounded-xl border border-slate-300 px-3 text-base outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => handleSearchChange(e.target.value)}
                 placeholder="姓名／手機／車牌"
                 aria-label="搜尋姓名、手機或車牌"
               />

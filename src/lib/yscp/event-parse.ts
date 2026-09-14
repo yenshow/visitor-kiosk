@@ -1,4 +1,4 @@
-import { normalizePlateNo } from "@/lib/kiosk/plate";
+import { normalizePlateNo } from "@/lib/kiosk/normalize";
 
 type JsonObject = Record<string, unknown>;
 
