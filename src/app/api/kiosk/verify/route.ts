@@ -5,8 +5,18 @@ import {
   withCompleteVisitorInfo,
 } from "@/lib/kiosk/appoint-lookup";
 import { jsonError, jsonOk } from "@/lib/kiosk/api-helpers";
+import { getClientIp } from "@/lib/kiosk/access";
 import { lookupOnSiteRecords } from "@/lib/kiosk/on-site-lookup";
 import { normalizePhoneDigits, normalizePlateNo } from "@/lib/kiosk/normalize";
+import {
+  checkQueryLock,
+  clearQueryFailures,
+  QUERY_RATE_MAX,
+  QUERY_RATE_WINDOW_MS,
+  rateLimitResponse,
+  recordQueryFailure,
+  takeRateToken,
+} from "@/lib/kiosk/rate-limit";
 import { createCheckinToken } from "@/lib/kiosk/session";
 import { displayVisitorName } from "@/lib/kiosk/visitor-fields";
 import {
@@ -17,7 +27,18 @@ import { visitReasonLabel } from "@/lib/kiosk/visit-reason";
 
 const alreadyOnSiteMessage = "您已在場，如需臨時外出或簽退請使用訪客簽退";
 
+const queryKeyOf = (phoneNo: string, appointCode: string) =>
+  phoneNo ? `p:${phoneNo}` : `c:${appointCode}`;
+
 export const POST = async (request: Request) => {
+  const ip = getClientIp(request.headers);
+  const limited = takeRateToken(
+    `query:${ip}:verify`,
+    QUERY_RATE_MAX,
+    QUERY_RATE_WINDOW_MS,
+  );
+  if (!limited.ok) return rateLimitResponse(limited.retryAfterSec);
+
   try {
     const body = (await request.json()) as VisitorQueryInput;
     const { appointCode, phoneNo } = parseVisitorQuery(body);
@@ -25,6 +46,10 @@ export const POST = async (request: Request) => {
     if (!appointCode && !phoneNo) {
       return jsonError("請輸入預約號碼／密碼或手機號碼");
     }
+
+    const qKey = queryKeyOf(phoneNo, appointCode);
+    const lock = checkQueryLock(qKey);
+    if (lock.locked) return rateLimitResponse(lock.retryAfterSec);
 
     const matchedRaw = await findAppointmentsByQuery({ appointCode, phoneNo });
     const onSiteResult = await lookupOnSiteRecords({
@@ -37,6 +62,7 @@ export const POST = async (request: Request) => {
       (item) => item.presence === "temp_out",
     );
     if (tempOutRecords.length > 0) {
+      clearQueryFailures(qKey);
       return jsonOk({ appointments: [], tempOutRecords });
     }
 
@@ -48,6 +74,7 @@ export const POST = async (request: Request) => {
     );
 
     if (pending.length === 0) {
+      recordQueryFailure(qKey);
       if (onSiteResult.records.length > 0) {
         return jsonError(alreadyOnSiteMessage, 409);
       }
@@ -59,6 +86,8 @@ export const POST = async (request: Request) => {
       }
       return jsonError(appointmentStatusMessage(matched[0]?.appointStatus), 409);
     }
+
+    clearQueryFailures(qKey);
 
     const appointments = [];
     for (const item of pending) {

@@ -50,9 +50,8 @@ export const toggleSelectedToken = (tokens: string[], token: string) =>
 export const postCheckoutModes = async (
   tokens: string[],
   mode: "temp" | "return" | "final",
-): Promise<{ message: string; exitGateMinutes: number | null }> => {
+): Promise<{ message: string }> => {
   let message = "";
-  let exitGateMinutes: number | null = null;
   for (const token of tokens) {
     const res = await fetch("/api/kiosk/checkout", {
       method: "POST",
@@ -61,16 +60,10 @@ export const postCheckoutModes = async (
     });
     const json = (await res.json()) as {
       msg?: string;
-      data?: { message?: string; exitGateMinutes?: number | null };
+      data?: { message?: string };
     };
     if (!res.ok) throw new Error(json.msg || "操作失敗");
     message = json.data?.message || message;
-    if (
-      typeof json.data?.exitGateMinutes === "number" &&
-      json.data.exitGateMinutes > 0
-    ) {
-      exitGateMinutes = json.data.exitGateMinutes;
-    }
   }
-  return { message, exitGateMinutes };
+  return { message };
 };

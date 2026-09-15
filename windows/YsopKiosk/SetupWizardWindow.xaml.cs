@@ -1,4 +1,6 @@
+using System.Net;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -6,10 +8,9 @@ namespace YsopKiosk;
 
 public partial class SetupWizardWindow : Window
 {
-    private const string DestTemplate = "http://192.168.x.x:3010/api/yscp/events";
-
     private readonly string _root;
     private readonly List<ExitLaneItem> _lanes = new();
+    private int _listenPort = 3010;
     public bool Applied { get; private set; }
 
     public SetupWizardWindow(string root)
@@ -18,6 +19,61 @@ public partial class SetupWizardWindow : Window
         _root = root;
         Loaded += async (_, _) => await LoadInitialAsync();
     }
+
+    private string DestTemplate => $"http://192.168.x.x:{_listenPort}/api/yscp/events";
+
+    private void RefreshDestHint()
+    {
+        TxtDestHint.Text =
+            $"範本：http://本機區網IP:{_listenPort}/api/yscp/events（YSCP 須能連到，請用 http）";
+    }
+
+    private static bool LooksLikeIpv4(string raw)
+    {
+        var host = raw.Trim();
+        if (host.Contains(':')) host = host.Split(':')[0];
+        return IPAddress.TryParse(host, out var addr) &&
+               addr.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork;
+    }
+
+    private static string ExtractIpv4(string raw)
+    {
+        var host = raw.Trim().Replace("https://", "", StringComparison.OrdinalIgnoreCase)
+            .Replace("http://", "", StringComparison.OrdinalIgnoreCase)
+            .Split('/')[0];
+        if (host.Contains(':')) host = host.Split(':')[0];
+        return LooksLikeIpv4(host) ? host : "";
+    }
+
+    private bool TryParseListenPort(out int port, out string error)
+    {
+        error = "";
+        port = 3010;
+        if (!int.TryParse(TxtListenPort.Text.Trim(), out port) || port < 1 || port > 65535)
+        {
+            error = "服務埠須為 1–65535（可用 80）。";
+            return false;
+        }
+        return true;
+    }
+
+    private void SyncDestPortIfNeeded()
+    {
+        if (!TryParseListenPort(out var port, out _)) return;
+        _listenPort = port;
+        RefreshDestHint();
+        var dest = TxtEventDest.Text.Trim();
+        if (string.IsNullOrEmpty(dest)) return;
+        // 替換本機 webhook URL 的埠號
+        var updated = Regex.Replace(
+            dest,
+            @"(https?://[^/:\s]+):(\d+)(/api/yscp/events)",
+            $"$1:{port}$3",
+            RegexOptions.IgnoreCase);
+        if (updated != dest) TxtEventDest.Text = updated;
+    }
+
+    private void OnListenPortLostFocus(object sender, RoutedEventArgs e) => SyncDestPortIfNeeded();
 
     private async Task LoadInitialAsync()
     {
@@ -28,9 +84,17 @@ public partial class SetupWizardWindow : Window
             if (!string.IsNullOrEmpty(host)) TxtHost.Text = host;
             TxtAk.Text = st.GetString("accessKey");
             TxtSk.Text = st.GetString("secretKey");
+            var listen = st.GetInt("listenPort", 3010);
+            if (listen is >= 1 and <= 65535)
+            {
+                _listenPort = listen;
+                TxtListenPort.Text = listen.ToString();
+            }
+            TxtAdminIps.Text = st.GetString("adminIps").Replace(",", "\n");
 
             _lanes.Clear();
-            if (st.Raw.TryGetProperty("exitLanes", out var lanes) &&
+            if (st.Raw.ValueKind == JsonValueKind.Object &&
+                st.Raw.TryGetProperty("exitLanes", out var lanes) &&
                 lanes.ValueKind == JsonValueKind.Array)
             {
                 foreach (var el in lanes.EnumerateArray())
@@ -48,14 +112,18 @@ public partial class SetupWizardWindow : Window
             RefreshLanesLabel();
         }
 
+        RefreshDestHint();
+
         var ips = await YscpBridgeClient.RunAsync(_root, "lan-ips");
         var current = ips.GetString("currentDest");
         if (!string.IsNullOrEmpty(current))
         {
             TxtEventDest.Text = current;
+            SyncDestPortIfNeeded();
             return;
         }
-        if (ips.Ok && ips.Raw.TryGetProperty("dests", out var dests) &&
+        if (ips.Ok && ips.Raw.ValueKind == JsonValueKind.Object &&
+            ips.Raw.TryGetProperty("dests", out var dests) &&
             dests.ValueKind == JsonValueKind.Array)
         {
             var first = dests.EnumerateArray().Select(d => d.GetString())
@@ -63,6 +131,7 @@ public partial class SetupWizardWindow : Window
             if (!string.IsNullOrEmpty(first))
             {
                 TxtEventDest.Text = first;
+                SyncDestPortIfNeeded();
                 return;
             }
         }
@@ -96,6 +165,15 @@ public partial class SetupWizardWindow : Window
             error = "請填入 AK、SK。";
             return false;
         }
+        if (!TryParseListenPort(out _listenPort, out error)) return false;
+
+        var hostIp = ExtractIpv4(TxtHost.Text);
+        if (string.IsNullOrEmpty(hostIp) || !LooksLikeIpv4(hostIp))
+        {
+            error = "HOST 須為 YSCP 的 IPv4（防火牆來源＝HOST）。";
+            return false;
+        }
+
         var dest = ResolveDest();
         if (string.IsNullOrWhiteSpace(dest) || dest.Contains("192.168.x.x", StringComparison.Ordinal))
         {
@@ -113,12 +191,22 @@ public partial class SetupWizardWindow : Window
 
     private async Task<bool> SaveConnectionAsync()
     {
+        if (!TryParseListenPort(out var port, out var err))
+        {
+            MessageBox.Show(err, "YSCP", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return false;
+        }
+        _listenPort = port;
+        SyncDestPortIfNeeded();
+
         var save = await YscpBridgeClient.RunAsync(_root,
             "save-connection",
             "--host", TxtHost.Text.Trim(),
             "--ak", TxtAk.Text.Trim(),
             "--sk", TxtSk.Text.Trim(),
-            "--event-dest", ResolveDest());
+            "--event-dest", ResolveDest(),
+            "--port", port.ToString(),
+            "--admin-ips", TxtAdminIps.Text.Trim());
         if (!save.Ok)
         {
             MessageBox.Show(save.Error ?? "儲存連線失敗", "YSCP", MessageBoxButton.OK, MessageBoxImage.Error);
@@ -276,8 +364,22 @@ public partial class SetupWizardWindow : Window
                     "YSCP", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
 
+            var (fwOk, fwMsg) = FirewallHelper.ApplyInboundAllow(
+                _listenPort,
+                ExtractIpv4(TxtHost.Text),
+                TxtAdminIps.Text);
+            if (!fwOk)
+            {
+                MessageBox.Show(
+                    $"設定已寫入，但防火牆未更新：{fwMsg}\n請以系統管理員手動放行入站 TCP {_listenPort}（僅 YSCP／管理員 IP）。",
+                    AppBrand.ProductName, MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+
             Applied = true;
-            MessageBox.Show("YSCP 設定已套用（含事件訂閱）。將重啟訪客機服務。", AppBrand.ProductName,
+            var extra = fwOk ? $"\n{fwMsg}" : "";
+            MessageBox.Show(
+                $"YSCP 設定已套用（含事件訂閱）。將重啟訪客機服務。{extra}",
+                AppBrand.ProductName,
                 MessageBoxButton.OK, MessageBoxImage.Information);
             DialogResult = true;
             Close();

@@ -2,17 +2,19 @@ using System.Windows;
 
 namespace YsopKiosk;
 
-/// <summary>Singleton host for WebView2 kiosk / setting windows.</summary>
+/// <summary>Singleton host for WebView2 kiosk / setting windows。</summary>
 internal sealed class KioskUiHost
 {
-    private readonly int _port;
+    private readonly Func<int> _portProvider;
     private KioskWindow? _kiosk;
     private SettingWindow? _setting;
 
-    internal KioskUiHost(int port) => _port = port;
+    internal KioskUiHost(Func<int> portProvider) => _portProvider = portProvider;
 
-    internal string KioskUrl => $"http://127.0.0.1:{_port}/";
-    internal string SettingUrl => $"http://127.0.0.1:{_port}/setting";
+    internal int Port => _portProvider();
+
+    internal string KioskUrl => $"http://127.0.0.1:{Port}/";
+    internal string SettingUrl => $"http://127.0.0.1:{Port}/setting";
 
     internal void OpenKiosk()
     {

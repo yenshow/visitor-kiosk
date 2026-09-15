@@ -80,11 +80,7 @@ export const POST = async (request: Request) => {
 
     void reapplyAuth(visitorId).catch(() => undefined);
 
-    return jsonOk({
-      appointRecordId: result.appointRecordId ?? null,
-      visitorId: result.visitorId ?? visitorId,
-      qrCodeImage: result.qrCodeImage ?? null,
-    });
+    return jsonOk({});
   } catch (error) {
     return jsonError(
       error instanceof Error ? error.message : "簽到失敗",

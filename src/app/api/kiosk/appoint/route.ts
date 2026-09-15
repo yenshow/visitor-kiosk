@@ -116,9 +116,6 @@ export const POST = async (request: Request) => {
     }
 
     return jsonOk({
-      appointRecordId: result.appointRecordId ?? null,
-      visitorId: result.visitorId ?? null,
-      automaticApproval,
       waitingMessage,
     });
   } catch (error) {

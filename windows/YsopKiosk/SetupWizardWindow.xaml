@@ -5,18 +5,19 @@
         Width="720"
         SizeToContent="Height"
         MinWidth="640"
-        MaxHeight="900"
+        MaxHeight="920"
         WindowStartupLocation="CenterOwner"
         FontSize="14"
         ResizeMode="NoResize"
         Background="{StaticResource ShellGradientBrush}"
         Foreground="{StaticResource TextPrimaryBrush}">
+  <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="880">
   <StackPanel Margin="20">
     <TextBlock Text="YSCP 設定" FontSize="20" FontWeight="SemiBold"
                Foreground="{StaticResource TextPrimaryBrush}"/>
     <TextBlock x:Name="TxtHint" FontSize="13" Margin="0,3,0,14"
                Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"
-               Text="填寫連線、Webhook、出口車道後套用（寫入 .env 並自動訂閱事件）。"/>
+               Text="填寫連線、服務埠、來源限制、Webhook、出口車道後套用（寫入 .env、防火牆與事件訂閱）。"/>
 
     <!-- 連線 -->
     <Border Padding="14,12" Margin="0,0,0,12"
@@ -27,7 +28,7 @@
         <TextBlock Style="{StaticResource SectionHeader}" Text="連線"/>
         <Grid>
           <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="72"/>
+            <ColumnDefinition Width="110"/>
             <ColumnDefinition Width="*"/>
           </Grid.ColumnDefinitions>
           <Grid.RowDefinitions>
@@ -38,7 +39,8 @@
           <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource FormLabel}"
                      VerticalAlignment="Center" Text="HOST"/>
           <TextBox Grid.Row="0" Grid.Column="1" x:Name="TxtHost"
-                   Style="{StaticResource ThemedTextBox}" Margin="0,0,0,8"/>
+                   Style="{StaticResource ThemedTextBox}" Margin="0,0,0,8"
+                   ToolTip="須為 YSCP 的 IPv4（防火牆來源＝此 IP）"/>
           <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource FormLabel}"
                      VerticalAlignment="Center" Text="AK"/>
           <TextBox Grid.Row="1" Grid.Column="1" x:Name="TxtAk"
@@ -46,7 +48,41 @@
           <TextBlock Grid.Row="2" Grid.Column="0" Style="{StaticResource FormLabel}"
                      VerticalAlignment="Center" Text="SK"/>
           <TextBox Grid.Row="2" Grid.Column="1" x:Name="TxtSk"
-                   Style="{StaticResource ThemedTextBox}"/>
+                   Style="{StaticResource ThemedTextBox}" Margin="0,0,0,8"/>
+        </Grid>
+      </StackPanel>
+    </Border>
+
+    <!-- 服務埠與來源 -->
+    <Border Padding="14,12" Margin="0,0,0,12"
+            Background="{StaticResource CardBackgroundBrush}"
+            BorderBrush="{StaticResource CardBorderBrush}"
+            BorderThickness="1" CornerRadius="10">
+      <StackPanel>
+        <TextBlock Style="{StaticResource SectionHeader}" Text="服務埠與來源限制"/>
+        <TextBlock Style="{StaticResource FormHint}" Margin="0,0,0,8"
+                   Text="防火牆僅放行 YSCP（HOST 的 IPv4）與管理員 IP。訪客畫面走本機，不需入站。埠可用 80。"/>
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="110"/>
+            <ColumnDefinition Width="*"/>
+          </Grid.ColumnDefinitions>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+          </Grid.RowDefinitions>
+          <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource FormLabel}"
+                     VerticalAlignment="Center" Text="服務埠"/>
+          <TextBox Grid.Row="0" Grid.Column="1" x:Name="TxtListenPort"
+                   Style="{StaticResource ThemedTextBox}" Margin="0,0,0,8"
+                   Text="3010" LostFocus="OnListenPortLostFocus"/>
+          <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource FormLabel}"
+                     VerticalAlignment="Top" Margin="0,8,0,0" Text="管理員 IP"/>
+          <TextBox Grid.Row="1" Grid.Column="1" x:Name="TxtAdminIps"
+                   Style="{StaticResource ThemedTextBox}" MinHeight="64"
+                   AcceptsReturn="True" TextWrapping="Wrap"
+                   VerticalScrollBarVisibility="Auto"
+                   ToolTip="瀏覽器連線端的 IP（非本機訪客機 IP）；可多行或逗號；空白則僅本機可開設定頁"/>
         </Grid>
       </StackPanel>
     </Border>
@@ -58,7 +94,7 @@
             BorderThickness="1" CornerRadius="10">
       <StackPanel>
         <TextBlock Style="{StaticResource SectionHeader}" Text="事件 Webhook"/>
-        <TextBlock Style="{StaticResource FormHint}"
+        <TextBlock x:Name="TxtDestHint" Style="{StaticResource FormHint}"
                    Text="範本：http://本機區網IP:3010/api/yscp/events（YSCP 須能連到，請用 http）"/>
         <TextBox x:Name="TxtEventDest" Style="{StaticResource ThemedTextBox}" Margin="0,8,0,0"/>
       </StackPanel>
@@ -120,4 +156,5 @@
       <Button Content="取消" MinWidth="100" Click="OnCancel"/>
     </StackPanel>
   </StackPanel>
+  </ScrollViewer>
 </Window>

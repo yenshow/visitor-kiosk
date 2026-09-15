@@ -1,5 +1,6 @@
+"use client";
+
 import type { ReactNode } from "react";
-import type { RecordsFilter } from "@/lib/kiosk/ui-constants";
 
 export type KioskStatsView = {
   onSite: number;
@@ -15,7 +16,6 @@ type HomeActionCardsProps = {
   onCheckin: () => void;
   onCheckout: () => void;
   onAppoint: () => void;
-  onOpenRecords: (filter: RecordsFilter) => void;
   showAppoint?: boolean;
   stats?: KioskStatsView | null;
 };
@@ -23,11 +23,10 @@ type HomeActionCardsProps = {
 const STAT_ITEMS: {
   label: string;
   key: keyof Pick<KioskStatsView, "onSite" | "tempOut" | "departed">;
-  filter: RecordsFilter;
 }[] = [
-  { label: "目前在場", key: "onSite", filter: "on_site" },
-  { label: "臨時外出", key: "tempOut", filter: "temp_out" },
-  { label: "今日離場", key: "departed", filter: "departed_today" },
+  { label: "目前在場", key: "onSite" },
+  { label: "臨時外出", key: "tempOut" },
+  { label: "今日離場", key: "departed" },
 ];
 
 const TILE_BASE =
@@ -59,52 +58,31 @@ const TileIcon = ({ children }: { children: ReactNode }) => (
 const StatCell = ({
   label,
   value,
-  onClick,
 }: {
   label: string;
   value?: number;
-  onClick?: () => void;
-}) => {
-  const body = (
-    <>
-      <span className="text-lg tracking-wide text-(--text-secondary) landscape:text-2xl">
-        {label}
+}) => (
+  <div
+    className={STAT_SHELL}
+    aria-label={value != null ? `${label} ${value}` : label}
+  >
+    <span className="text-lg tracking-wide text-(--text-secondary) landscape:text-2xl">
+      {label}
+    </span>
+    {value != null ? (
+      <span className="mt-2 text-[36px] font-bold tabular-nums leading-none text-(--text-primary) landscape:mt-3 landscape:text-[96px]">
+        {value}
       </span>
-      {value != null ? (
-        <span className="mt-2 text-[36px] font-bold tabular-nums leading-none text-(--text-primary) landscape:mt-3 landscape:text-[96px]">
-          {value}
-        </span>
-      ) : (
-        <span className="mt-2 block h-9 landscape:mt-3 landscape:h-24" />
-      )}
-    </>
-  );
-
-  if (onClick && value != null) {
-    return (
-      <button
-        type="button"
-        className={`${STAT_SHELL} outline-none transition hover:bg-(--surface-panel-hover) focus-visible:ring-2 focus-visible:ring-(--focus-ring) active:scale-[0.99]`}
-        aria-label={`${label} ${value}，開啟訪客紀錄`}
-        onClick={onClick}
-      >
-        {body}
-      </button>
-    );
-  }
-
-  return (
-    <div className={STAT_SHELL} aria-hidden="true">
-      {body}
-    </div>
-  );
-};
+    ) : (
+      <span className="mt-2 block h-9 landscape:mt-3 landscape:h-24" />
+    )}
+  </div>
+);
 
 export const HomeActionCards = ({
   onCheckin,
   onCheckout,
   onAppoint,
-  onOpenRecords,
   showAppoint = true,
   stats,
 }: HomeActionCardsProps) => (
@@ -117,12 +95,9 @@ export const HomeActionCards = ({
     >
       {STAT_ITEMS.map((item) => (
         <StatCell
-          key={item.filter}
+          key={item.key}
           label={item.label}
           value={stats?.[item.key]}
-          onClick={
-            stats ? () => onOpenRecords(item.filter) : undefined
-          }
         />
       ))}
       {!stats ? <span className="sr-only">統計載入中</span> : null}

@@ -10,12 +10,14 @@
  *   status | lan-ips | save-connection | cameras | relays | save-lanes
  *   subscribe | open
  */
+import { randomBytes } from "crypto";
 import { existsSync } from "fs";
 import path from "path";
 import {
   buildYscpEventDest,
+  extractYscpHostIpv4,
   getConfig,
-  YSCP_EVENT_TOKEN_DEFAULT,
+  getKioskListenPort,
 } from "../src/lib/config";
 import type { ExitLane } from "../src/lib/kiosk/exit-lanes";
 import { ensureEventSubscription } from "../src/lib/yscp/event-api";
@@ -28,6 +30,7 @@ import {
 import {
   listLanIps,
   loadDotEnv,
+  removeEnvLine,
   upsertEnvLine,
   writeUtf8,
 } from "./env-file";
@@ -70,7 +73,6 @@ const parseArgs = (argv: string[]) => {
 };
 
 const resolveHere = (): string => {
-  // CJS bundle (esbuild) provides __dirname; always prefer --root from caller
   const dirname = (globalThis as { __dirname?: string }).__dirname;
   if (dirname) return dirname;
   return process.cwd();
@@ -92,6 +94,16 @@ const resolveEnvPath = (root: string): string => {
   return path.join(root, ".env");
 };
 
+const newEventToken = () => randomBytes(24).toString("hex");
+
+const parseListenPort = (raw: string): number => {
+  const n = Number(String(raw ?? "").trim());
+  if (!Number.isFinite(n) || n < 1 || n > 65535) {
+    fail("服務埠須為 1–65535");
+  }
+  return Math.floor(n);
+};
+
 const main = async () => {
   const { root: rootArg, command, flags } = parseArgs(process.argv);
   const root = resolveRoot(rootArg);
@@ -109,9 +121,13 @@ const main = async () => {
       hasCredentials,
       host: cfg.yscp.hostname,
       port: cfg.yscp.port,
+      listenPort: cfg.kiosk.listenPort,
       accessKey: cfg.yscp.accessKey,
       secretKey: cfg.yscp.secretKey,
       eventDest: cfg.yscp.eventDest,
+      eventToken: cfg.yscp.eventToken,
+      firewallSourceIp: cfg.yscp.firewallSourceIp,
+      adminIps: cfg.kiosk.adminIps,
       exitLaneCount: cfg.yscp.exitLanes.length,
       exitLanes: cfg.yscp.exitLanes,
     });
@@ -120,12 +136,13 @@ const main = async () => {
 
   if (command === "lan-ips") {
     const ips = listLanIps();
+    const listenPort = getKioskListenPort();
     emit({
       ok: true,
       ips,
-      dests: ips.map((ip) => buildYscpEventDest(ip)),
+      listenPort,
+      dests: ips.map((ip) => buildYscpEventDest(ip, listenPort)),
       currentDest: process.env.YSCP_EVENT_DEST ?? "",
-      tokenDefault: YSCP_EVENT_TOKEN_DEFAULT,
     });
     return;
   }
@@ -135,21 +152,44 @@ const main = async () => {
     const ak = String(flags.ak ?? "").trim();
     const sk = String(flags.sk ?? "").trim();
     const eventDest = String(flags["event-dest"] ?? flags.eventDest ?? "").trim();
-    const token = String(
-      flags.token ?? process.env.YSCP_EVENT_TOKEN ?? YSCP_EVENT_TOKEN_DEFAULT,
-    ).trim();
+    const adminIps = String(flags["admin-ips"] ?? flags.adminIps ?? "").trim();
+    const firewallSourceIp = extractYscpHostIpv4(host);
+
+    const portFlag = String(flags.port ?? "").trim();
+    const listenPort = portFlag
+      ? parseListenPort(portFlag)
+      : getKioskListenPort();
+
+    let token = String(flags.token ?? process.env.YSCP_EVENT_TOKEN ?? "").trim();
+    if (!token) token = newEventToken();
+
     if (!host) fail("HOST 必填");
     if (!ak || !sk) fail("請填入 YSCP_AK／YSCP_SK");
     if (!eventDest) fail("缺少 event-dest（YSCP_EVENT_DEST）");
+    if (!firewallSourceIp) {
+      fail("YSCP_HOST 須為 IPv4（防火牆來源＝HOST）");
+    }
+
     if (!existsSync(envPath)) writeUtf8(envPath, "");
     upsertEnvLine(envPath, "YSCP_HOST", host);
     upsertEnvLine(envPath, "YSCP_AK", ak);
     upsertEnvLine(envPath, "YSCP_SK", sk);
     upsertEnvLine(envPath, "YSCP_EVENT_DEST", eventDest);
-    upsertEnvLine(envPath, "YSCP_EVENT_TOKEN", token || YSCP_EVENT_TOKEN_DEFAULT);
-    upsertEnvLine(envPath, "PORT", process.env.PORT || "3010");
+    upsertEnvLine(envPath, "YSCP_EVENT_TOKEN", token);
+    upsertEnvLine(envPath, "KIOSK_ADMIN_IPS", adminIps);
+    upsertEnvLine(envPath, "PORT", String(listenPort));
     upsertEnvLine(envPath, "HOSTNAME", process.env.HOSTNAME || "0.0.0.0");
-    emit({ ok: true, envPath, host, eventDest });
+    removeEnvLine(envPath, "YSCP_SOURCE_IP");
+    removeEnvLine(envPath, "YSCP_TLS_INSECURE");
+    emit({
+      ok: true,
+      envPath,
+      host,
+      eventDest,
+      listenPort,
+      firewallSourceIp,
+      adminIps,
+    });
     return;
   }
 

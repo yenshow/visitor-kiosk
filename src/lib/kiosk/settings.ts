@@ -14,6 +14,8 @@ export type KioskSettings = {
   theme: KioskTheme;
   /** 自訂 logo 檔名（位於 data/）；空字串表示使用預設 public logo */
   logoFileName: string;
+  /** 訪客須知影片：YouTube／影片網址／路徑；空＝/notice.mp4 */
+  noticeVideoUrl: string;
   /** 現場預約待核准時同步通知的信箱（空＝不寄） */
   approverEmails: string[];
 };
@@ -45,6 +47,7 @@ const emptySettings = (): KioskSettings => ({
   showAppoint: true,
   theme: DEFAULT_THEME,
   logoFileName: "",
+  noticeVideoUrl: "",
   approverEmails: [],
 });
 
@@ -83,6 +86,10 @@ const readStore = async (): Promise<KioskSettings> => {
       theme: normalizeTheme(parsed.theme),
       logoFileName:
         typeof parsed.logoFileName === "string" ? parsed.logoFileName : "",
+      noticeVideoUrl:
+        typeof parsed.noticeVideoUrl === "string"
+          ? parsed.noticeVideoUrl
+          : String(process.env.NEXT_PUBLIC_NOTICE_VIDEO_URL ?? "").trim(),
       approverEmails: normalizeApproverEmails(parsed.approverEmails),
     };
   } catch {
@@ -111,7 +118,10 @@ export const getSettings = async (): Promise<KioskSettings> => readStore();
 
 export const updateSettings = async (
   patch: Partial<
-    Pick<KioskSettings, "marquee" | "showAppoint" | "theme" | "approverEmails">
+    Pick<
+      KioskSettings,
+      "marquee" | "showAppoint" | "theme" | "noticeVideoUrl" | "approverEmails"
+    >
   >,
 ): Promise<KioskSettings> => {
   const current = await readStore();
@@ -124,6 +134,9 @@ export const updateSettings = async (
     ...(patch.theme === "light" || patch.theme === "dark"
       ? { theme: patch.theme }
       : {}),
+    ...(typeof patch.noticeVideoUrl === "string"
+      ? { noticeVideoUrl: patch.noticeVideoUrl.trim().slice(0, 1000) }
+      : {}),
     ...(Array.isArray(patch.approverEmails)
       ? { approverEmails: normalizeApproverEmails(patch.approverEmails) }
       : {}),
@@ -135,6 +148,10 @@ export const updateSettings = async (
 /** 畫面用跑馬燈：本機設定 → 寫死預設 */
 export const resolveMarquee = (settings: KioskSettings): string =>
   settings.marquee.trim() || DEFAULT_MARQUEE;
+
+/** 須知影片 URL；空則預設 /notice.mp4（由 resolveNoticeVideoSource 處理） */
+export const resolveNoticeVideoUrl = (settings: KioskSettings): string =>
+  settings.noticeVideoUrl.trim();
 
 export const getLogoAbsolutePath = (
   logoFileName: string,
@@ -198,15 +215,16 @@ export const clearCustomLogo = async (): Promise<KioskSettings> => {
   return next;
 };
 
-/** API 回傳給前端的設定視圖 */
+/** API 回傳給前端的設定視圖（不含 approverEmails） */
 export const toSettingsView = (settings: KioskSettings) => ({
   marquee: settings.marquee,
   resolvedMarquee: resolveMarquee(settings),
   showAppoint: settings.showAppoint,
   theme: settings.theme,
+  noticeVideoUrl: settings.noticeVideoUrl,
+  resolvedNoticeVideoUrl: resolveNoticeVideoUrl(settings),
   hasCustomLogo: Boolean(settings.logoFileName),
   logoUrl: settings.logoFileName
     ? `/api/kiosk/settings/logo?v=${encodeURIComponent(settings.logoFileName)}`
     : "/yenshow-logo.svg",
-  approverEmails: settings.approverEmails,
 });

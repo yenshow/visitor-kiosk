@@ -45,7 +45,7 @@ export default function SettingPage() {
   return (
     <div className="flex min-h-dvh flex-col overflow-y-auto bg-(image:--shell-gradient) text-(--text-primary)">
       <ThemeSync theme={settings?.theme} />
-      <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center px-4 py-8">
+      <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col justify-center px-4 py-8">
         <FlowCard title="服務機設定" onBack={handleBack}>
           {error ? (
             <p className="text-lg text-red-600" role="alert">

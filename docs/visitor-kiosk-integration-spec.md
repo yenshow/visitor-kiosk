@@ -15,12 +15,14 @@
 
 - 金鑰與簽章只在後端（`YSCP_AK` / `YSCP_SK`）。時區 `Asia/Taipei`。
 - 報到／簽退下一步用一次性 token（記憶體、10 分鐘）；前端不帶 `appointID`。
-- 本機：`data/kiosk-presence.json`（單一 `visits[]`：一筆訪客一個 status；開閘比對另受 15 分鐘時限）、`data/kiosk-settings.json`、`data/kiosk-logo.*`。設定頁 `/setting`。
+- 本機：`data/kiosk-presence.json`（單一 `visits[]`：一筆訪客一個 status；開閘比對另受 15 分鐘時限）、`data/kiosk-settings.json`、`data/kiosk-logo.*`。設定頁 `/setting`（僅本機或 `KIOSK_ADMIN_IPS`）。
 - 無操作 20 秒回首頁。
+- 管理 API／紀錄／設定寫入需管理員 IP；`POST /api/yscp/events` 僅驗事件 token。
+- 查詢 API 有 rate limit 與失敗鎖定；管理操作寫入 `runtime/audit.log`（不含個資）。
 
 ## 2. 業務流程
 
-首頁：**訪客報到**、**訪客簽退**、可關閉的**訪客預約**；統計「目前在場／臨時外出／今日離場」點擊開啟訪客紀錄（另可篩「全部／逾期在場／所有離場」；**逾期在場不顯示於首頁統計列**）。預約可來自 YSCP Web 或現場 Kiosk；現場送出後不顯示密碼，待內部確認。
+首頁：**訪客報到**、**訪客簽退**、可關閉的**訪客預約**；統計「目前在場／臨時外出／今日離場」**僅顯示數字，不開啟明細**（訪客紀錄在設定頁，與重置並排；可篩「全部／逾期在場／所有離場」；**逾期在場不顯示於首頁統計列**）。預約可來自 YSCP Web 或現場 Kiosk；現場送出後不顯示密碼，待內部確認。
 
 **查詢（單一輸入框）：** 8～15 碼純數字視為手機（整號比對，共乘可多人）；其餘視為 YSCP **4 碼**預約碼（僅精準比對 `appointCode` 或 `appointID`，不用 ID 後綴）。預約碼查在廠只鎖 `visitorId`，不以同手機帶出他人。逾期不自動 YSCP 簽退。
 
@@ -60,7 +62,7 @@
 
 ### 2.5 本機設定與紀錄
 
-`/setting` 無需登入：跑馬燈（空則寫死預設文案）、主題 `light`｜`dark`（cookie + `public/theme-init.js`）、logo（無則 `public/yenshow-logo.svg`）、`showAppoint`、**重置訪客統計**（刪全部 departed；temp_out→on_site；**保留** on_site 欄位；不批次 YSCP 簽退）。訪客紀錄：統計摘要＋明細（姓名／手機／車牌／公司／被訪人／時間），可篩全部／目前在場／臨時外出／逾期在場／今日離場／所有離場；不匯出。
+`/setting` 僅本機或 `KIOSK_ADMIN_IPS`：跑馬燈（空則寫死預設文案）、主題 `light`｜`dark`（cookie + `public/theme-init.js`）、logo（無則 `public/yenshow-logo.svg`）、`showAppoint`、**訪客紀錄**、**重置訪客統計**（刪全部 departed；temp_out→on_site；**保留** on_site 欄位；不批次 YSCP 簽退）。訪客紀錄：統計摘要＋明細（姓名／手機／車牌／公司／被訪人／時間），可篩全部／目前在場／臨時外出／逾期在場／今日離場／所有離場；不匯出。
 
 本機主檔形狀：`{ visits: VisitorVisit[] }`（舊三陣列格式讀取時自動遷移）。
 
@@ -68,24 +70,26 @@
 
 前端只呼叫下列路由。成功 `{ "code": "0", "msg": "Success", "data": ... }`；失敗 `code` 為 HTTP 狀態字串，`data` 為 `null`。
 
+**存取：** `PUT settings`、`POST logo`、`GET records`、`POST records/reset`、`POST yscp/subscribe`、頁面 `/setting` → 須本機或管理員 IP。其餘訪客流程與 `GET settings`／`GET logo` 公開（仍受防火牆遠端 IP 限制）。
+
 | 方法 | 路徑 | 用途 |
 |------|------|------|
-| GET | `/api/kiosk/status` | 是否已設定 YSCP 金鑰 |
+| GET | `/api/kiosk/status` | `{ hasCredentials }` |
 | GET | `/api/kiosk/stats` | `{ onSite, tempOut, overstay, departed, departedTotal }`（departed＝今日離場） |
-| GET | `/api/kiosk/records` | 訪客紀錄 `{ summary, rows }`（含跨日離場；row 可含 `isDepartedToday`） |
-| POST | `/api/kiosk/records/reset` | 清 departed、取消 temp_out；保留 on_site |
-| GET / PUT | `/api/kiosk/settings` | 跑馬燈、主題、預約開關；Set-Cookie `theme` |
-| GET / POST | `/api/kiosk/settings/logo` | 讀取／上傳／`reset=1`（≤2MB） |
+| GET | `/api/kiosk/records` | 訪客紀錄 `{ summary, rows }`（管理員） |
+| POST | `/api/kiosk/records/reset` | 清 departed、取消 temp_out；保留 on_site（管理員） |
+| GET / PUT | `/api/kiosk/settings` | GET 公開（不含 approverEmails）；PUT 管理員 |
+| GET / POST | `/api/kiosk/settings/logo` | GET 公開；POST 上傳／`reset=1`（管理員，≤2MB） |
 | GET | `/api/kiosk/notice` | 訪客須知 Markdown |
 | GET | `/api/kiosk/orgs` | 部門（含路徑標籤） |
 | POST | `/api/kiosk/hosts` | `{ orgIndexCode }` 載入被訪人 |
-| POST | `/api/kiosk/appoint` | 建立預約 |
-| POST | `/api/kiosk/verify` | 報到查詢 `{ query }`；外出中回 `tempOutRecords` |
-| POST | `/api/kiosk/checkin` | `{ token, acceptedNotice: true }` |
-| POST | `/api/kiosk/checkout/lookup` | 簽退查詢 `{ query }` |
-| POST | `/api/kiosk/checkout` | `{ token, mode?: "temp"\|"return"\|"final" }`；成功可含 `exitGateMinutes` |
-| POST | `/api/kiosk/yscp/subscribe` | 重訂事件 131622 |
-| POST | `/api/yscp/events` | YSCP Webhook（先 200，背景開閘） |
+| POST | `/api/kiosk/appoint` | 建立預約；成功僅回 `waitingMessage` |
+| POST | `/api/kiosk/verify` | 報到查詢 `{ query }`；外出中回 `tempOutRecords`（有限流／失敗鎖定） |
+| POST | `/api/kiosk/checkin` | `{ token, acceptedNotice: true }`；成功 `data` 為 `{}` |
+| POST | `/api/kiosk/checkout/lookup` | 簽退查詢 `{ query }`（有限流／失敗鎖定） |
+| POST | `/api/kiosk/checkout` | `{ token, mode?: "temp"\|"return"\|"final" }`；成功回 `mode`／`message` |
+| POST | `/api/kiosk/yscp/subscribe` | 重訂事件 131622（管理員） |
+| POST | `/api/yscp/events` | YSCP Webhook（header／body token；先 200，背景開閘） |
 
 **預約** 必填 `receptionistId`、`email`、`phoneNo`、時段；姓／名至少其一。空的姓或名寫入 `-`（畫面隱藏）。施工 `visitReasonType === 4` 帶 `visitReasonDetail: "施工"`。車牌正規化後放 `VisitorInfo.plateNo`。黑名單 `watchListInfo` 回 409。不回傳 `AppointCode`。
 

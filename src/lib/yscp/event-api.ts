@@ -48,6 +48,9 @@ export const ensureEventSubscription = async (): Promise<{
   if (!yscp.accessKey || !yscp.secretKey) {
     return { skipped: true, reason: "未設定 YSCP_AK / YSCP_SK" };
   }
+  if (!yscp.eventToken) {
+    return { skipped: true, reason: "未設定 YSCP_EVENT_TOKEN" };
+  }
 
   const data = await subscribeEventByTypes({
     eventDest: yscp.eventDest,

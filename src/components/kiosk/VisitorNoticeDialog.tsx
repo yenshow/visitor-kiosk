@@ -31,10 +31,11 @@ export const VisitorNoticeDialog = ({
   const [reachedBottom, setReachedBottom] = useState(false);
   const [fetching, setFetching] = useState(true);
   const [videoAvailable, setVideoAvailable] = useState(true);
+  const [noticeVideoUrl, setNoticeVideoUrl] = useState("");
 
   const videoSource = useMemo(
-    () => resolveNoticeVideoSource(process.env.NEXT_PUBLIC_NOTICE_VIDEO_URL),
-    [],
+    () => resolveNoticeVideoSource(noticeVideoUrl),
+    [noticeVideoUrl],
   );
 
   const updateReachedBottom = () => {
@@ -50,12 +51,27 @@ export const VisitorNoticeDialog = ({
     let cancelled = false;
     const load = async () => {
       try {
-        const res = await fetch("/api/kiosk/notice");
-        const json = (await res.json()) as {
+        const [noticeRes, settingsRes] = await Promise.all([
+          fetch("/api/kiosk/notice"),
+          showVideo ? fetch("/api/kiosk/settings") : Promise.resolve(null),
+        ]);
+        const noticeJson = (await noticeRes.json()) as {
           data?: { content?: string };
         };
         if (!cancelled) {
-          setContent(json.data?.content ?? "請詳閱訪客須知。");
+          setContent(noticeJson.data?.content ?? "請詳閱訪客須知。");
+        }
+        if (settingsRes) {
+          const settingsJson = (await settingsRes.json()) as {
+            data?: { noticeVideoUrl?: string; resolvedNoticeVideoUrl?: string };
+          };
+          if (!cancelled) {
+            setNoticeVideoUrl(
+              settingsJson.data?.resolvedNoticeVideoUrl ??
+                settingsJson.data?.noticeVideoUrl ??
+                "",
+            );
+          }
         }
       } catch {
         if (!cancelled) setContent("無法載入訪客須知，請洽現場人員。");
@@ -67,7 +83,7 @@ export const VisitorNoticeDialog = ({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [showVideo]);
 
   useEffect(() => {
     if (fetching) return;
@@ -141,15 +157,8 @@ export const VisitorNoticeDialog = ({
               </div>
             ) : (
               <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-base text-amber-800">
-                須知影片無法播放。請確認{" "}
-                <code className="rounded bg-amber-100 px-1">
-                  NEXT_PUBLIC_NOTICE_VIDEO_URL
-                </code>{" "}
-                （YouTube／影片網址／資料夾，例如{" "}
-                <code className="rounded bg-amber-100 px-1">/videos/</code> →{" "}
-                <code className="rounded bg-amber-100 px-1">
-                  /videos/notice.mp4
-                </code>
+                須知影片無法播放。請至設定頁確認「訪客須知影片」（YouTube／影片網址，或本機{" "}
+                <code className="rounded bg-amber-100 px-1">/notice.mp4</code>
                 ）。
               </p>
             )

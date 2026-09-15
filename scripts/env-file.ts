@@ -48,6 +48,15 @@ export const upsertEnvLine = (
   process.env[key] = value;
 };
 
+/** 刪除 .env 中的鍵（含相鄰空白行整理由呼叫端決定） */
+export const removeEnvLine = (envPath: string, key: string) => {
+  if (!existsSync(envPath)) return;
+  const re = new RegExp(`^${key}=.*\\r?\\n?`, "m");
+  const text = readUtf8(envPath).replace(re, "");
+  writeUtf8(envPath, text);
+  delete process.env[key];
+};
+
 export const listLanIps = (): string[] => {
   const ips: string[] = [];
   for (const addrs of Object.values(os.networkInterfaces())) {

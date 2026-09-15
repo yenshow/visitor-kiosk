@@ -19,7 +19,7 @@ const processPlateEvent = async (event: ParsedPlateEvent) => {
   const lane = findExitLane(yscp.exitLanes, event.cameraIndexCode);
   if (!lane) {
     console.info(
-      `[yscp-events] 略過非出口相機 camera=${event.cameraIndexCode} plate=${event.plateNo}`,
+      `[yscp-events] 略過非出口相機 camera=${event.cameraIndexCode}`,
     );
     return;
   }
@@ -27,14 +27,14 @@ const processPlateEvent = async (event: ParsedPlateEvent) => {
   const allow = await isExitPlateAllowed(event.plateNo);
   if (!allow.allowed) {
     console.info(
-      `[yscp-events] 車牌未在出場名單 plate=${event.plateNo} camera=${event.cameraIndexCode}`,
+      `[yscp-events] 車牌未在出場名單 camera=${event.cameraIndexCode}`,
     );
     return;
   }
 
   if (!tryClaimGateDedup(event.plateNo, event.cameraIndexCode)) {
     console.info(
-      `[yscp-events] 去重略過 plate=${event.plateNo} camera=${event.cameraIndexCode}`,
+      `[yscp-events] 去重略過 camera=${event.cameraIndexCode}`,
     );
     return;
   }
@@ -44,11 +44,11 @@ const processPlateEvent = async (event: ParsedPlateEvent) => {
       alarmOutputIndexCode: lane.alarmOutputIndexCode,
     });
     console.info(
-      `[yscp-events] 開閘 reason=${allow.reason} plate=${event.plateNo} relay=${lane.alarmOutputIndexCode} hold=${holdMs}ms`,
+      `[yscp-events] 開閘 reason=${allow.reason} camera=${event.cameraIndexCode} relay=${lane.alarmOutputIndexCode} hold=${holdMs}ms`,
     );
   } catch (error) {
     console.error(
-      `[yscp-events] 開閘失敗 plate=${event.plateNo}`,
+      `[yscp-events] 開閘失敗 camera=${event.cameraIndexCode} relay=${lane.alarmOutputIndexCode}`,
       error instanceof Error ? error.message : error,
     );
   }
@@ -56,7 +56,6 @@ const processPlateEvent = async (event: ParsedPlateEvent) => {
 
 /** 立刻回 200，背景比對／開閘，避免 YSCP 推送逾時 */
 export const POST = async (request: Request) => {
-  const url = new URL(request.url);
   let body = null as ReturnType<typeof asJsonObject>;
   try {
     body = asJsonObject(await request.json());
@@ -72,7 +71,7 @@ export const POST = async (request: Request) => {
     );
   }
 
-  if (extractYscpEventToken(request, body, url) !== expected) {
+  if (extractYscpEventToken(request, body) !== expected) {
     return Response.json({ code: "1", msg: "invalid token" }, { status: 401 });
   }
 
@@ -83,8 +82,8 @@ export const POST = async (request: Request) => {
   }
 
   console.info(
-    `[yscp-events] 收到 ${events.length} 筆車牌事件 ${events
-      .map((event) => `${event.plateNo}@${event.cameraIndexCode}`)
+    `[yscp-events] 收到 ${events.length} 筆車牌事件 cameras=${events
+      .map((event) => event.cameraIndexCode)
       .join(",")}`,
   );
 

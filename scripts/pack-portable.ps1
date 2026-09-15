@@ -188,6 +188,9 @@ foreach ($name in @("public", "content")) {
 
 Copy-Item $CachedNodeExe (Join-Path $OutDir "node\node.exe") -Force
 Copy-Item (Join-Path $ToolsDir "yscp-bridge.cjs") (Join-Path $OutDir "tools\yscp-bridge.cjs") -Force
+$WithIp = Join-Path $RepoRoot "tools\with-client-ip.cjs"
+if (-not (Test-Path -LiteralPath $WithIp)) { throw "Missing tools\with-client-ip.cjs" }
+Copy-Item -LiteralPath $WithIp -Destination (Join-Path $OutDir "tools\with-client-ip.cjs") -Force
 Copy-Item $ManagerExe (Join-Path $OutDir "YsopKiosk.exe") -Force
 
 # 圖示：installer/assets（YSOP.ico＝安裝檔；kiosk.ico＝桌面捷徑／exe）
@@ -207,7 +210,7 @@ Get-ChildItem $PortableSrc -File | ForEach-Object {
 
 foreach ($req in @(
   "app\server.js", "app\node_modules", "app\package.json", "app\.env",
-  "node\node.exe", "tools\yscp-bridge.cjs", "YsopKiosk.exe",
+  "node\node.exe", "tools\yscp-bridge.cjs", "tools\with-client-ip.cjs", "YsopKiosk.exe",
   "kiosk.ico", "README-現場.txt"
 )) {
   if (-not (Test-Path -LiteralPath (Join-Path $OutDir $req))) {

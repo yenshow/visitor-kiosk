@@ -79,11 +79,7 @@ export const POST = async (request: Request) => {
     consumeCheckoutToken(token);
     return jsonOk({
       mode,
-      appointRecordId,
-      plateNo: plateNo || null,
       message: messages[mode],
-      exitGateMinutes:
-        mode === "temp" || mode === "final" ? exitGateMinutes : null,
     });
   } catch (error) {
     return jsonError(

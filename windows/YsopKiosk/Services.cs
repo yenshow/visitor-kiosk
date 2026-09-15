@@ -153,7 +153,9 @@ internal sealed class KioskProcessService
     internal string PidFile => Path.Combine(_root, "runtime", "node.pid");
     internal string LogFile => Path.Combine(_root, "runtime", "server.log");
     internal string ErrFile => Path.Combine(_root, "runtime", "server.err.log");
-    internal int Port => 3010;
+
+    /** 與 app\.env 的 PORT 同步（預設 3010） */
+    internal int Port => DotEnvReader.GetListenPort(_root);
 
     internal async Task<bool> IsRunningAsync()
     {
@@ -176,12 +178,14 @@ internal sealed class KioskProcessService
         var node = Path.Combine(_root, "node", "node.exe");
         var server = Path.Combine(_root, "app", "server.js");
         var appDir = Path.Combine(_root, "app");
+        var wrap = Path.Combine(_root, "tools", "with-client-ip.cjs");
         if (!File.Exists(node) || !File.Exists(server))
             throw new FileNotFoundException("找不到 node.exe 或 app\\server.js");
 
         Directory.CreateDirectory(Path.Combine(_root, "runtime"));
         Directory.CreateDirectory(Path.Combine(appDir, "data"));
 
+        var listenPort = Port;
         var psi = new ProcessStartInfo
         {
             FileName = node,
@@ -191,8 +195,12 @@ internal sealed class KioskProcessService
             RedirectStandardOutput = true,
             RedirectStandardError = true,
         };
-        psi.ArgumentList.Add(server);
-        psi.Environment["PORT"] = Port.ToString();
+        // 優先用 IP 注入包裝；缺檔時退回直接啟動 server.js
+        if (File.Exists(wrap))
+            psi.ArgumentList.Add(wrap);
+        else
+            psi.ArgumentList.Add(server);
+        psi.Environment["PORT"] = listenPort.ToString();
         psi.Environment["HOSTNAME"] = "0.0.0.0";
         psi.Environment["NEXT_TELEMETRY_DISABLED"] = "1";
 
@@ -224,7 +232,11 @@ internal sealed class KioskProcessService
             if (await IsRunningAsync()) return;
             if (_node.HasExited) break;
         }
-        throw new TimeoutException("服務啟動逾時，請查看 runtime\\server.log");
+
+        var hint = listenPort is 80 or 443
+            ? "（綁定 80／443 等特權埠可能需以系統管理員執行 YsopKiosk.exe）"
+            : "";
+        throw new TimeoutException($"服務啟動逾時，請查看 runtime\\server.log{hint}");
     }
 
     internal void Stop()

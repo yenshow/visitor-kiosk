@@ -15,4 +15,4 @@ npm run pack
 
 說明：[docs/env-setup.md](docs/env-setup.md)。流程／API：[docs/visitor-kiosk-integration-spec.md](docs/visitor-kiosk-integration-spec.md)。
 
-本機開發可另跑 `npm run setup:yscp`（只寫專案根 `.env`，不進封裝）。
+本機開發：複製／編輯專案根 `.env`；YSCP 連線請用 `YsopKiosk.exe` → **YSCP 設定**（或手動填寫與精靈相同的鍵）。

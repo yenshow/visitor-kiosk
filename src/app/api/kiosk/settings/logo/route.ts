@@ -1,5 +1,7 @@
 import { readFile } from "fs/promises";
 import { jsonError, jsonOk } from "@/lib/kiosk/api-helpers";
+import { guardAdminAction } from "@/lib/kiosk/admin-guard";
+import { writeAudit } from "@/lib/kiosk/audit";
 import {
   clearCustomLogo,
   extensionForMime,
@@ -12,7 +14,7 @@ import {
   toSettingsView,
 } from "@/lib/kiosk/settings";
 
-/** GET：自訂 logo 二進位；無自訂則 404（前端改用預設 public logo） */
+/** GET：自訂 logo；無自訂則 404 */
 export const GET = async () => {
   try {
     const settings = await getSettings();
@@ -31,13 +33,18 @@ export const GET = async () => {
   }
 };
 
-/** POST：multipart 上傳 logo；欄位 reset=1 則恢復預設 */
+/** POST：上傳 logo；reset=1 恢復預設 */
 export const POST = async (request: Request) => {
+  const { ip, denied } = await guardAdminAction(request, "settings.logo");
+  if (denied) return denied;
+
   try {
     const form = await request.formData();
     const reset = String(form.get("reset") ?? "").trim();
     if (reset === "1" || reset === "true") {
-      return jsonOk(toSettingsView(await clearCustomLogo()));
+      const view = toSettingsView(await clearCustomLogo());
+      await writeAudit({ action: "settings.logo.reset", result: "ok", ip });
+      return jsonOk(view);
     }
 
     const file = form.get("file");
@@ -50,8 +57,16 @@ export const POST = async (request: Request) => {
     if (!extension) return jsonError("僅支援 PNG、JPG、SVG、WebP");
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    return jsonOk(toSettingsView(await saveCustomLogo(buffer, extension)));
+    const view = toSettingsView(await saveCustomLogo(buffer, extension));
+    await writeAudit({ action: "settings.logo.upload", result: "ok", ip });
+    return jsonOk(view);
   } catch (error) {
+    await writeAudit({
+      action: "settings.logo",
+      result: "error",
+      ip,
+      detail: error instanceof Error ? error.message : "fail",
+    });
     return jsonError(
       error instanceof Error ? error.message : "上傳 Logo 失敗",
       500,

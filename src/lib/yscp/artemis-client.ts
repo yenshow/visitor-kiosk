@@ -41,7 +41,7 @@ export type ArtemisResponse<T = unknown> = {
   data: T;
 };
 
-/** HTTPS POST（內網自簽憑證不驗證 TLS） */
+/** HTTPS POST（內網 YSCP 固定略過憑證驗證） */
 export const artemisPostSecure = async <T = unknown>(
   path: string,
   body: Record<string, unknown> = {},

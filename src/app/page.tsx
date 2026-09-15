@@ -10,13 +10,11 @@ import {
   type KioskStatsView,
 } from "@/components/kiosk/HomeActionCards";
 import { KioskShell } from "@/components/kiosk/KioskShell";
-import { RecordsDialog } from "@/components/kiosk/RecordsDialog";
 import type { KioskSettingsView } from "@/components/kiosk/SettingsForm";
 import { ThemeSync } from "@/components/kiosk/ThemeSync";
 import {
   DEFAULT_MARQUEE,
   KIOSK_IDLE_SECONDS,
-  type RecordsFilter,
 } from "@/lib/kiosk/ui-constants";
 
 type Screen = "home" | "appoint" | "checkin" | "checkout";
@@ -48,8 +46,6 @@ export default function HomePage() {
   const [status, setStatus] = useState<StatusInfo | null>(null);
   const [stats, setStats] = useState<KioskStatsView | null>(null);
   const [settings, setSettings] = useState<KioskSettingsView | null>(null);
-  const [recordsOpen, setRecordsOpen] = useState(false);
-  const [recordsFilter, setRecordsFilter] = useState<RecordsFilter>("all");
 
   useEffect(() => {
     let cancelled = false;
@@ -119,10 +115,6 @@ export default function HomePage() {
             onCheckin={() => setScreen("checkin")}
             onCheckout={() => setScreen("checkout")}
             onAppoint={() => setScreen("appoint")}
-            onOpenRecords={(filter) => {
-              setRecordsFilter(filter);
-              setRecordsOpen(true);
-            }}
           />
         ) : null}
 
@@ -156,14 +148,6 @@ export default function HomePage() {
           </FlowPanel>
         ) : null}
       </KioskShell>
-
-      {recordsOpen ? (
-        <RecordsDialog
-          key={recordsFilter}
-          initialFilter={recordsFilter}
-          onClose={() => setRecordsOpen(false)}
-        />
-      ) : null}
     </>
   );
 }

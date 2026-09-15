@@ -16,7 +16,7 @@ public partial class MainWindow : Window
         InitializeComponent();
         _root = InstallRootResolver.Resolve();
         _kiosk = new KioskProcessService(_root);
-        _ui = new KioskUiHost(_kiosk.Port);
+        _ui = new KioskUiHost(() => _kiosk.Port);
         Loaded += async (_, _) =>
         {
             EnsureInstallHooks();
@@ -80,7 +80,9 @@ public partial class MainWindow : Window
     private async Task UpdateTrayTooltipAsync()
     {
         var running = await _kiosk.IsRunningAsync();
-        _tray?.UpdateTooltip(running ? AppBrand.ProductName + " 運行中 :3010" : AppBrand.ProductName + " 已停止");
+        _tray?.UpdateTooltip(running
+            ? $"{AppBrand.ProductName} 運行中 :{_kiosk.Port}"
+            : $"{AppBrand.ProductName} 已停止");
     }
 
     internal async Task RefreshStatusAsync()

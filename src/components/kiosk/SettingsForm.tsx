@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { RecordsPanel } from "@/components/kiosk/RecordsDialog";
 import {
   applyThemeClass,
   writeThemeCookie,
@@ -12,6 +13,8 @@ export type KioskSettingsView = {
   resolvedMarquee: string;
   showAppoint: boolean;
   theme: KioskTheme;
+  noticeVideoUrl: string;
+  resolvedNoticeVideoUrl: string;
   hasCustomLogo: boolean;
   logoUrl: string;
 };
@@ -24,6 +27,9 @@ type SettingsFormProps = {
 export const SettingsForm = ({ initial, onSaved }: SettingsFormProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [marquee, setMarquee] = useState(initial?.marquee ?? "");
+  const [noticeVideoUrl, setNoticeVideoUrl] = useState(
+    initial?.noticeVideoUrl ?? "",
+  );
   const [showAppoint, setShowAppoint] = useState(initial?.showAppoint ?? true);
   const [theme, setTheme] = useState<KioskTheme>(
     initial?.theme === "dark" ? "dark" : "light",
@@ -38,6 +44,7 @@ export const SettingsForm = ({ initial, onSaved }: SettingsFormProps) => {
   const [resetConfirm, setResetConfirm] = useState(false);
   const [error, setError] = useState("");
   const [savedHint, setSavedHint] = useState("");
+  const [recordsReload, setRecordsReload] = useState(0);
 
   const applyLogoView = (data: KioskSettingsView) => {
     setLogoUrl(data.logoUrl);
@@ -87,7 +94,7 @@ export const SettingsForm = ({ initial, onSaved }: SettingsFormProps) => {
       const res = await fetch("/api/kiosk/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ marquee, showAppoint, theme }),
+        body: JSON.stringify({ marquee, noticeVideoUrl, showAppoint, theme }),
       });
       const json = (await res.json()) as {
         msg?: string;
@@ -124,6 +131,7 @@ export const SettingsForm = ({ initial, onSaved }: SettingsFormProps) => {
       }
       setResetConfirm(false);
       setSavedHint(json.data?.message || "已重置訪客統計");
+      setRecordsReload((n) => n + 1);
     } catch {
       setError("重置失敗");
     } finally {
@@ -142,9 +150,27 @@ export const SettingsForm = ({ initial, onSaved }: SettingsFormProps) => {
           value={marquee}
           onChange={(e) => setMarquee(e.target.value)}
           maxLength={500}
-          placeholder="留空則使用環境變數或預設文案"
+          placeholder="留空則使用預設文案"
           aria-label="跑馬燈文字"
         />
+      </label>
+
+      <label className="block">
+        <span className="mb-2 block text-base font-medium text-slate-700">
+          訪客須知影片
+        </span>
+        <input
+          type="url"
+          className="min-h-12 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-lg outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
+          value={noticeVideoUrl}
+          onChange={(e) => setNoticeVideoUrl(e.target.value)}
+          maxLength={1000}
+          placeholder="留空＝/notice.mp4；可填 YouTube 或影片網址"
+          aria-label="訪客須知影片網址"
+        />
+        <p className="mt-2 text-sm text-slate-500">
+          支援 YouTube、直接影片網址，或本機路徑（如 /notice.mp4）
+        </p>
       </label>
 
       <div>
@@ -268,6 +294,8 @@ export const SettingsForm = ({ initial, onSaved }: SettingsFormProps) => {
           />
         </span>
       </button>
+
+      <RecordsPanel reloadToken={recordsReload} />
 
       <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
         <h3 className="text-lg font-semibold text-amber-950">重置訪客統計</h3>
