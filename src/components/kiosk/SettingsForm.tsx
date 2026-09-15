@@ -1,7 +1,7 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { RecordsPanel } from "@/components/kiosk/RecordsDialog";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { RecordsDialog } from "@/components/kiosk/RecordsDialog";
 import {
   applyThemeClass,
   writeThemeCookie,
@@ -24,8 +24,62 @@ type SettingsFormProps = {
   onSaved?: (settings: KioskSettingsView) => void;
 };
 
+const RESET_DESC =
+  "清除所有離場累計，並取消本機臨時外出標記；保留在場訪客完整資料。不影響 YSCP 在廠狀態。";
+
+const LABEL = "mb-2 block text-base font-medium text-slate-700";
+const FIELD =
+  "w-full rounded-xl border border-slate-300 bg-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30";
+const BTN =
+  "min-h-12 cursor-pointer rounded-xl px-4 text-base font-semibold disabled:cursor-not-allowed disabled:opacity-50";
+const BTN_DARK = `${BTN} bg-slate-800 text-white active:bg-slate-700`;
+const BTN_OUTLINE = `${BTN} border border-slate-300 bg-white text-slate-700 active:bg-slate-100`;
+const BTN_WARN = `${BTN} border border-amber-400 bg-white text-amber-900 active:bg-amber-100`;
+const BTN_DANGER = `${BTN} bg-red-600 text-white active:bg-red-700`;
+const HINT = "mt-2 text-sm text-slate-500";
+
+const THEME_OPTIONS = [
+  {
+    value: "light" as const,
+    label: "明亮",
+    icon: (
+      <>
+        <circle cx="12" cy="12" r="4" />
+        <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+      </>
+    ),
+  },
+  {
+    value: "dark" as const,
+    label: "黑暗",
+    icon: <path d="M21 14.5A8.5 8.5 0 1 1 9.5 3 7 7 0 0 0 21 14.5z" />,
+  },
+];
+
+const Icon = ({
+  children,
+  className = "size-6",
+}: {
+  children: ReactNode;
+  className?: string;
+}) => (
+  <svg
+    viewBox="0 0 24 24"
+    className={className}
+    aria-hidden
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    {children}
+  </svg>
+);
+
 export const SettingsForm = ({ initial, onSaved }: SettingsFormProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const resetTitleId = useId();
   const [marquee, setMarquee] = useState(initial?.marquee ?? "");
   const [noticeVideoUrl, setNoticeVideoUrl] = useState(
     initial?.noticeVideoUrl ?? "",
@@ -42,9 +96,24 @@ export const SettingsForm = ({ initial, onSaved }: SettingsFormProps) => {
   const [uploading, setUploading] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [resetConfirm, setResetConfirm] = useState(false);
+  const [recordsOpen, setRecordsOpen] = useState(false);
   const [error, setError] = useState("");
   const [savedHint, setSavedHint] = useState("");
   const [recordsReload, setRecordsReload] = useState(0);
+
+  useEffect(() => {
+    if (!resetConfirm) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !resetting) setResetConfirm(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [resetConfirm, resetting]);
+
+  const clearStatus = () => {
+    setError("");
+    setSavedHint("");
+  };
 
   const applyLogoView = (data: KioskSettingsView) => {
     setLogoUrl(data.logoUrl);
@@ -54,8 +123,7 @@ export const SettingsForm = ({ initial, onSaved }: SettingsFormProps) => {
 
   const postLogo = async (form: FormData, failMsg: string) => {
     setUploading(true);
-    setError("");
-    setSavedHint("");
+    clearStatus();
     try {
       const res = await fetch("/api/kiosk/settings/logo", {
         method: "POST",
@@ -87,8 +155,7 @@ export const SettingsForm = ({ initial, onSaved }: SettingsFormProps) => {
 
   const handleSave = async () => {
     setSaving(true);
-    setError("");
-    setSavedHint("");
+    clearStatus();
     setResetConfirm(false);
     try {
       const res = await fetch("/api/kiosk/settings", {
@@ -117,8 +184,7 @@ export const SettingsForm = ({ initial, onSaved }: SettingsFormProps) => {
 
   const handleResetStats = async () => {
     setResetting(true);
-    setError("");
-    setSavedHint("");
+    clearStatus();
     try {
       const res = await fetch("/api/kiosk/records/reset", { method: "POST" });
       const json = (await res.json()) as {
@@ -139,80 +205,15 @@ export const SettingsForm = ({ initial, onSaved }: SettingsFormProps) => {
     }
   };
 
+  const handleCloseResetConfirm = () => {
+    if (resetting) return;
+    setResetConfirm(false);
+  };
+
   return (
     <div className="w-full space-y-6">
-      <label className="block">
-        <span className="mb-2 block text-base font-medium text-slate-700">
-          跑馬燈文字
-        </span>
-        <textarea
-          className="min-h-28 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-lg outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
-          value={marquee}
-          onChange={(e) => setMarquee(e.target.value)}
-          maxLength={500}
-          placeholder="留空則使用預設文案"
-          aria-label="跑馬燈文字"
-        />
-      </label>
-
-      <label className="block">
-        <span className="mb-2 block text-base font-medium text-slate-700">
-          訪客須知影片
-        </span>
-        <input
-          type="url"
-          className="min-h-12 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-lg outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
-          value={noticeVideoUrl}
-          onChange={(e) => setNoticeVideoUrl(e.target.value)}
-          maxLength={1000}
-          placeholder="留空＝/notice.mp4；可填 YouTube 或影片網址"
-          aria-label="訪客須知影片網址"
-        />
-        <p className="mt-2 text-sm text-slate-500">
-          支援 YouTube、直接影片網址，或本機路徑（如 /notice.mp4）
-        </p>
-      </label>
-
       <div>
-        <span className="mb-2 block text-base font-medium text-slate-700">
-          顯示模式
-        </span>
-        <div
-          className="grid grid-cols-2 gap-3"
-          role="radiogroup"
-          aria-label="明亮或黑暗模式"
-        >
-          {(
-            [
-              { value: "light" as const, label: "明亮模式" },
-              { value: "dark" as const, label: "黑暗模式" },
-            ] as const
-          ).map((opt) => {
-            const selected = theme === opt.value;
-            return (
-              <button
-                key={opt.value}
-                type="button"
-                role="radio"
-                aria-checked={selected}
-                className={`min-h-14 rounded-xl border px-4 text-lg font-semibold active:scale-[0.98] ${
-                  selected
-                    ? "border-blue-600 bg-blue-600 text-white"
-                    : "border-slate-300 bg-white text-slate-800"
-                }`}
-                onClick={() => handleThemeChange(opt.value)}
-              >
-                {opt.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      <div>
-        <span className="mb-2 block text-base font-medium text-slate-700">
-          公司 Logo
-        </span>
+        <span className={LABEL}>公司 Logo</span>
         <div className="flex flex-wrap items-center gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
           {/* 動態自訂 Logo URL，不適合 next/image 靜態優化 */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -224,7 +225,7 @@ export const SettingsForm = ({ initial, onSaved }: SettingsFormProps) => {
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              className="min-h-12 rounded-xl bg-slate-800 px-4 text-base font-semibold text-white active:bg-slate-700 disabled:opacity-50"
+              className={BTN_DARK}
               aria-label="選擇 Logo 檔案"
               disabled={uploading}
               onClick={() => fileInputRef.current?.click()}
@@ -234,7 +235,7 @@ export const SettingsForm = ({ initial, onSaved }: SettingsFormProps) => {
             {hasCustomLogo ? (
               <button
                 type="button"
-                className="min-h-12 rounded-xl border border-slate-300 bg-white px-4 text-base font-semibold text-slate-700 active:bg-slate-100 disabled:opacity-50"
+                className={BTN_OUTLINE}
                 aria-label="恢復預設 Logo"
                 disabled={uploading}
                 onClick={() => {
@@ -263,82 +264,185 @@ export const SettingsForm = ({ initial, onSaved }: SettingsFormProps) => {
             }}
           />
         </div>
-        <p className="mt-2 text-sm text-slate-500">
-          支援 PNG／JPG／SVG／WebP，上限 2MB
-        </p>
+        <p className={HINT}>支援 PNG／JPG／SVG／WebP，上限 2MB</p>
       </div>
 
-      <button
-        type="button"
-        role="switch"
-        aria-checked={showAppoint}
-        aria-label="顯示訪客預約入口"
-        className={`flex min-h-16 w-full items-center justify-between rounded-xl border px-4 text-left text-lg font-medium active:scale-[0.99] ${
-          showAppoint
-            ? "border-blue-600 bg-blue-50 text-blue-900"
-            : "border-slate-300 bg-white text-slate-800"
-        }`}
-        onClick={() => setShowAppoint((prev) => !prev)}
-      >
-        <span>顯示訪客預約入口</span>
-        <span
-          className={`relative h-8 w-14 rounded-full transition-colors ${
-            showAppoint ? "bg-blue-600" : "bg-slate-300"
-          }`}
-          aria-hidden
-        >
-          <span
-            className={`absolute top-1 size-6 rounded-full bg-white shadow transition-transform ${
-              showAppoint ? "left-7" : "left-1"
-            }`}
-          />
-        </span>
-      </button>
+      <label className="block">
+        <span className={LABEL}>跑馬燈文字</span>
+        <textarea
+          className={`${FIELD} min-h-28 px-4 py-3 text-lg`}
+          value={marquee}
+          onChange={(e) => setMarquee(e.target.value)}
+          maxLength={500}
+          placeholder="留空則使用預設文案"
+          aria-label="跑馬燈文字"
+        />
+      </label>
 
-      <RecordsPanel reloadToken={recordsReload} />
-
-      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-        <h3 className="text-lg font-semibold text-amber-950">重置訪客統計</h3>
-        <p className="mt-2 text-base text-amber-900">
-          清除所有離場累計，並取消本機臨時外出標記；保留在場訪客完整資料。不影響 YSCP 在廠狀態。
+      <label className="block">
+        <span className={LABEL}>訪客須知影片</span>
+        <input
+          type="url"
+          className={`${FIELD} min-h-12 px-4 py-3 text-lg`}
+          value={noticeVideoUrl}
+          onChange={(e) => setNoticeVideoUrl(e.target.value)}
+          maxLength={1000}
+          placeholder="留空＝/notice.mp4；可填 YouTube 或影片網址"
+          aria-label="訪客須知影片網址"
+        />
+        <p className={HINT}>
+          支援 YouTube、直接影片網址，或本機路徑（如 /notice.mp4）
         </p>
-        {resetConfirm ? (
-          <div className="mt-4 flex flex-wrap gap-2">
-            <button
-              type="button"
-              className="min-h-12 rounded-xl bg-red-600 px-4 text-base font-semibold text-white active:bg-red-700 disabled:opacity-50"
-              aria-label="確認重置訪客統計"
-              disabled={resetting}
-              onClick={() => void handleResetStats()}
-            >
-              {resetting ? "重置中…" : "確認重置"}
-            </button>
-            <button
-              type="button"
-              className="min-h-12 rounded-xl border border-slate-300 bg-white px-4 text-base font-semibold text-slate-700 active:bg-slate-100 disabled:opacity-50"
-              aria-label="取消重置"
-              disabled={resetting}
-              onClick={() => setResetConfirm(false)}
-            >
-              取消
-            </button>
-          </div>
-        ) : (
+      </label>
+
+      <div>
+        <span className={LABEL}>顯示模式</span>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <button
             type="button"
-            className="mt-4 min-h-12 rounded-xl border border-amber-400 bg-white px-4 text-base font-semibold text-amber-900 active:bg-amber-100 disabled:opacity-50"
+            role="switch"
+            aria-checked={showAppoint}
+            aria-label="訪客預約功能"
+            className={`flex min-h-16 cursor-pointer items-center justify-between gap-3 rounded-xl border px-4 text-left text-base font-semibold active:scale-[0.99] ${
+              showAppoint
+                ? "border-blue-600 bg-blue-50 text-blue-900"
+                : "border-slate-300 bg-white text-slate-800"
+            }`}
+            onClick={() => setShowAppoint((prev) => !prev)}
+          >
+            <span className="flex min-w-0 items-center gap-3">
+              <Icon className="size-7 shrink-0">
+                <rect x="3" y="4" width="18" height="18" rx="2" />
+                <path d="M16 2v4M8 2v4M3 10h18" />
+              </Icon>
+              <span className="leading-snug">訪客預約功能</span>
+            </span>
+            <span
+              className={`relative h-8 w-14 shrink-0 rounded-full transition-colors ${
+                showAppoint ? "bg-blue-600" : "bg-slate-300"
+              }`}
+              aria-hidden
+            >
+              <span
+                className={`absolute top-1 size-6 rounded-full bg-white shadow transition-transform ${
+                  showAppoint ? "left-7" : "left-1"
+                }`}
+              />
+            </span>
+          </button>
+
+          <div
+            className="grid grid-cols-2 gap-2"
+            role="radiogroup"
+            aria-label="明亮或黑暗模式"
+          >
+            {THEME_OPTIONS.map((opt) => {
+              const selected = theme === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  aria-label={`${opt.label}模式`}
+                  className={`flex min-h-16 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border px-2 text-sm font-semibold active:scale-[0.98] sm:text-base ${
+                    selected
+                      ? "border-blue-600 bg-blue-600 text-white"
+                      : "border-slate-300 bg-white text-slate-800"
+                  }`}
+                  onClick={() => handleThemeChange(opt.value)}
+                >
+                  <Icon>{opt.icon}</Icon>
+                  <span>{opt.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <h3 className={LABEL}>訪客紀錄</h3>
+          <button
+            type="button"
+            className={`${BTN_DARK} w-full`}
+            aria-label="開啟訪客紀錄"
+            aria-haspopup="dialog"
+            onClick={() => {
+              clearStatus();
+              setRecordsOpen(true);
+            }}
+          >
+            查看訪客紀錄
+          </button>
+        </div>
+        <div>
+          <h3 className={LABEL}>重置統計</h3>
+          <button
+            type="button"
+            className={`${BTN_WARN} w-full`}
             aria-label="重置訪客統計"
+            aria-haspopup="dialog"
             disabled={resetting || uploading || saving}
             onClick={() => {
-              setError("");
-              setSavedHint("");
+              clearStatus();
               setResetConfirm(true);
             }}
           >
             重置統計與紀錄
           </button>
-        )}
+        </div>
       </div>
+
+      <RecordsDialog
+        open={recordsOpen}
+        onClose={() => setRecordsOpen(false)}
+        reloadToken={recordsReload}
+      />
+
+      {resetConfirm ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          role="presentation"
+          onClick={handleCloseResetConfirm}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={resetTitleId}
+            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id={resetTitleId} className="text-xl font-bold text-slate-900">
+              確認重置訪客統計？
+            </h2>
+            <p className="mt-3 text-base leading-relaxed text-slate-700">
+              {RESET_DESC}
+            </p>
+            <div className="mt-6 flex gap-3">
+              <button
+                type="button"
+                className={`${BTN_OUTLINE} flex-1`}
+                aria-label="取消重置"
+                disabled={resetting}
+                onClick={handleCloseResetConfirm}
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                className={`${BTN_DANGER} flex-1`}
+                aria-label="確認重置訪客統計"
+                disabled={resetting}
+                onClick={() => void handleResetStats()}
+              >
+                {resetting ? "重置中…" : "確認重置"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {error ? (
         <p className="text-lg text-red-600" role="alert">
@@ -356,7 +460,7 @@ export const SettingsForm = ({ initial, onSaved }: SettingsFormProps) => {
         className={`min-h-14 w-full rounded-xl text-xl font-semibold text-white ${
           saving
             ? "cursor-not-allowed bg-slate-300"
-            : "bg-blue-600 active:bg-blue-700"
+            : "cursor-pointer bg-blue-600 active:bg-blue-700"
         }`}
         aria-label="儲存設定"
         disabled={saving}

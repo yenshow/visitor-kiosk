@@ -17,10 +17,11 @@ type VisitorRecordRow = {
   isDepartedToday?: boolean;
 };
 
-type RecordsPanelProps = {
-  initialFilter?: RecordsFilter;
-  /** 重置後遞增以重新載入 */
+type RecordsDialogProps = {
+  open: boolean;
+  onClose: () => void;
   reloadToken?: number;
+  initialFilter?: RecordsFilter;
 };
 
 const PAGE_SIZE = 10;
@@ -32,6 +33,7 @@ const SUMMARY_COLS = [
   "今日離場",
   "所有離場",
 ] as const;
+
 const DETAIL_COLS = [
   "狀態",
   "姓名",
@@ -60,10 +62,9 @@ const FILTER_OPTIONS: { value: RecordsFilter; label: string }[] = [
 
 const SECTION_TITLE =
   "mb-3 w-fit border-b-2 border-slate-400 pb-1 text-lg font-semibold text-slate-800";
-const TH = "border border-slate-200 px-3 py-2";
-const TD = "border border-slate-200 px-3 py-2";
-const PAGE_BTN =
-  "min-h-11 rounded-lg border border-slate-300 px-4 text-base font-semibold text-slate-700 active:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40";
+const CELL = "border border-slate-200 px-3 py-2";
+const BTN =
+  "min-h-11 cursor-pointer rounded-lg border border-slate-300 px-4 text-base font-semibold text-slate-700 active:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40";
 
 const matchesFilter = (
   row: VisitorRecordRow,
@@ -81,12 +82,13 @@ const matchesFilter = (
 
 const cellText = (value: string) => value || "—";
 
-/** 設定頁嵌入的訪客紀錄（管理員 API） */
-export const RecordsPanel = ({
+const RecordsPanel = ({
   initialFilter = "all",
   reloadToken = 0,
-}: RecordsPanelProps) => {
-  const titleId = useId();
+}: {
+  initialFilter?: RecordsFilter;
+  reloadToken?: number;
+}) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [summary, setSummary] = useState<KioskStatsView | null>(null);
@@ -158,177 +160,224 @@ export const RecordsPanel = ({
     : [];
 
   return (
-    <section
-      className="rounded-xl border border-slate-200 bg-white p-4"
-      aria-labelledby={titleId}
-      aria-busy={loading}
-    >
-      <h3 id={titleId} className="mb-4 text-lg font-semibold text-slate-800">
-        訪客紀錄
-      </h3>
+    <div className="flex w-full flex-col space-y-5" aria-busy={loading}>
+      {error ? (
+        <p className="text-lg text-red-600" role="alert">
+          {error}
+        </p>
+      ) : null}
 
-      <div className="flex w-full flex-col space-y-5">
-        {error ? (
-          <p className="text-lg text-red-600" role="alert">
-            {error}
-          </p>
-        ) : null}
+      {loading ? (
+        <div
+          className="h-14 rounded-xl border border-slate-200 bg-slate-50/80"
+          aria-hidden
+        />
+      ) : null}
 
-        {loading ? (
-          <div
-            className="h-14 rounded-xl border border-slate-200 bg-slate-50/80"
-            aria-hidden
+      {!loading && summary ? (
+        <div>
+          <h4 className={SECTION_TITLE}>統計摘要</h4>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse border border-slate-200 text-left text-base">
+              <thead className="bg-slate-100 text-slate-700">
+                <tr>
+                  {SUMMARY_COLS.map((label) => (
+                    <th key={label} className={CELL}>
+                      {label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  {summaryValues.map((value, index) => (
+                    <td
+                      key={SUMMARY_COLS[index]}
+                      className={`${CELL} tabular-nums`}
+                    >
+                      {value}
+                    </td>
+                  ))}
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div
+          className="flex flex-wrap gap-2"
+          role="tablist"
+          aria-label="狀態篩選"
+        >
+          {FILTER_OPTIONS.map((opt) => {
+            const selected = filter === opt.value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                role="tab"
+                aria-selected={selected}
+                className={`min-h-12 cursor-pointer rounded-xl border px-4 text-base font-semibold ${
+                  selected
+                    ? "border-blue-600 bg-blue-600 text-white"
+                    : "border-slate-300 bg-white text-slate-700 active:bg-slate-50"
+                }`}
+                onClick={() => {
+                  setFilter(opt.value);
+                  setPage(1);
+                }}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+        <label className="block min-w-56 flex-1 sm:max-w-xs">
+          <span className="mb-1 block text-sm font-medium text-slate-600">
+            搜尋
+          </span>
+          <input
+            type="search"
+            className="min-h-12 w-full rounded-xl border border-slate-300 px-3 text-base outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
+            placeholder="姓名／手機／車牌"
+            aria-label="搜尋姓名、手機或車牌"
           />
-        ) : null}
+        </label>
+      </div>
 
-        {!loading && summary ? (
-          <div className="shrink-0">
-            <h4 className={SECTION_TITLE}>統計摘要</h4>
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse border border-slate-200 text-left text-base">
-                <thead className="bg-slate-100 text-slate-700">
-                  <tr>
-                    {SUMMARY_COLS.map((label) => (
-                      <th key={label} className={TH}>
-                        {label}
-                      </th>
-                    ))}
+      {!loading && !error && filtered.length === 0 ? (
+        <div className="flex min-h-40 items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 p-8 text-center">
+          <p className="text-lg text-slate-500">尚無訪客紀錄</p>
+        </div>
+      ) : null}
+
+      {!loading && filtered.length > 0 ? (
+        <div className="min-w-0">
+          <h4 className={SECTION_TITLE}>明細</h4>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse border border-slate-200 text-left text-sm sm:text-base">
+              <thead className="bg-slate-100 text-slate-700">
+                <tr>
+                  {DETAIL_COLS.map((label) => (
+                    <th key={label} className={`whitespace-nowrap ${CELL}`}>
+                      {label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {pageRows.map((row) => (
+                  <tr
+                    key={`${row.presence}-${row.recordId}`}
+                    className="border-b border-slate-100"
+                  >
+                    <td className={CELL}>
+                      {row.presence === "departed" && row.isDepartedToday
+                        ? "今日離場"
+                        : PRESENCE_LABEL[row.presence]}
+                    </td>
+                    <td className={CELL}>{cellText(row.visitorName)}</td>
+                    <td className={CELL}>{cellText(row.phoneNo)}</td>
+                    <td className={CELL}>{cellText(row.plateNo)}</td>
+                    <td className={CELL}>{cellText(row.companyName)}</td>
+                    <td className={CELL}>{cellText(row.receptionistName)}</td>
+                    <td className={CELL}>{formatDateTime(row.at)}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    {summaryValues.map((value, index) => (
-                      <td
-                        key={SUMMARY_COLS[index]}
-                        className={`${TD} tabular-nums`}
-                      >
-                        {value}
-                      </td>
-                    ))}
-                  </tr>
-                </tbody>
-              </table>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-slate-500">
+              第 {pageSafe} / {totalPages} 頁，共 {filtered.length} 筆
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className={BTN}
+                aria-label="上一頁"
+                disabled={pageSafe <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                上一頁
+              </button>
+              <button
+                type="button"
+                className={BTN}
+                aria-label="下一頁"
+                disabled={pageSafe >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              >
+                下一頁
+              </button>
             </div>
           </div>
-        ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+};
 
-        <div className="flex shrink-0 flex-wrap items-end justify-between gap-3">
-          <div
-            className="flex flex-wrap gap-2"
-            role="tablist"
-            aria-label="狀態篩選"
+export const RecordsDialog = ({
+  open,
+  onClose,
+  reloadToken = 0,
+  initialFilter = "all",
+}: RecordsDialogProps) => {
+  const titleId = useId();
+
+  useEffect(() => {
+    if (!open) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      role="presentation"
+      onClick={onClose}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="flex max-h-[92vh] w-full max-w-5xl flex-col rounded-2xl bg-white shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 px-6 py-4">
+          <h2 id={titleId} className="text-2xl font-bold text-slate-900">
+            訪客紀錄
+          </h2>
+          <button
+            type="button"
+            className="min-h-12 cursor-pointer rounded-xl border border-slate-300 bg-white px-4 text-base font-semibold text-slate-700 active:bg-slate-50"
+            aria-label="關閉訪客紀錄"
+            onClick={onClose}
           >
-            {FILTER_OPTIONS.map((opt) => {
-              const selected = filter === opt.value;
-              return (
-                <button
-                  key={opt.value}
-                  type="button"
-                  role="tab"
-                  aria-selected={selected}
-                  className={`min-h-12 rounded-xl border px-4 text-base font-semibold ${
-                    selected
-                      ? "border-blue-600 bg-blue-600 text-white"
-                      : "border-slate-300 bg-white text-slate-700 active:bg-slate-50"
-                  }`}
-                  onClick={() => {
-                    setFilter(opt.value);
-                    setPage(1);
-                  }}
-                >
-                  {opt.label}
-                </button>
-              );
-            })}
-          </div>
-          <label className="block min-w-56 flex-1 sm:max-w-xs">
-            <span className="mb-1 block text-sm font-medium text-slate-600">
-              搜尋
-            </span>
-            <input
-              type="search"
-              className="min-h-12 w-full rounded-xl border border-slate-300 px-3 text-base outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setPage(1);
-              }}
-              placeholder="姓名／手機／車牌"
-              aria-label="搜尋姓名、手機或車牌"
-            />
-          </label>
+            關閉
+          </button>
         </div>
 
-        {!loading && !error && filtered.length === 0 ? (
-          <div className="flex min-h-40 items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 p-8 text-center">
-            <p className="text-lg text-slate-500">尚無訪客紀錄</p>
-          </div>
-        ) : null}
-
-        {!loading && filtered.length > 0 ? (
-          <div className="flex min-w-0 flex-col">
-            <h4 className={`${SECTION_TITLE} shrink-0`}>明細</h4>
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse border border-slate-200 text-left text-sm sm:text-base">
-                <thead className="bg-slate-100 text-slate-700">
-                  <tr>
-                    {DETAIL_COLS.map((label) => (
-                      <th key={label} className={`whitespace-nowrap ${TH}`}>
-                        {label}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {pageRows.map((row) => (
-                    <tr
-                      key={`${row.presence}-${row.recordId}`}
-                      className="border-b border-slate-100"
-                    >
-                      <td className={TD}>
-                        {row.presence === "departed" && row.isDepartedToday
-                          ? "今日離場"
-                          : PRESENCE_LABEL[row.presence]}
-                      </td>
-                      <td className={TD}>{cellText(row.visitorName)}</td>
-                      <td className={TD}>{cellText(row.phoneNo)}</td>
-                      <td className={TD}>{cellText(row.plateNo)}</td>
-                      <td className={TD}>{cellText(row.companyName)}</td>
-                      <td className={TD}>{cellText(row.receptionistName)}</td>
-                      <td className={TD}>{formatDateTime(row.at)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-              <p className="text-sm text-slate-500">
-                第 {pageSafe} / {totalPages} 頁，共 {filtered.length} 筆
-              </p>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  className={PAGE_BTN}
-                  aria-label="上一頁"
-                  disabled={pageSafe <= 1}
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                >
-                  上一頁
-                </button>
-                <button
-                  type="button"
-                  className={PAGE_BTN}
-                  aria-label="下一頁"
-                  disabled={pageSafe >= totalPages}
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                >
-                  下一頁
-                </button>
-              </div>
-            </div>
-          </div>
-        ) : null}
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+          <RecordsPanel
+            initialFilter={initialFilter}
+            reloadToken={reloadToken}
+          />
+        </div>
       </div>
-    </section>
+    </div>
   );
 };
