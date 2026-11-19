@@ -31,12 +31,27 @@ export const VisitorNoticeDialog = ({
   const [reachedBottom, setReachedBottom] = useState(false);
   const [fetching, setFetching] = useState(true);
   const [videoAvailable, setVideoAvailable] = useState(true);
-  const [noticeVideoUrl, setNoticeVideoUrl] = useState("");
+  /** null＝設定尚未載入，避免先用 /notice.mp4 觸發錯誤後再也播不了真正連結 */
+  const [noticeVideoUrl, setNoticeVideoUrl] = useState<string | null>(null);
 
   const videoSource = useMemo(
-    () => resolveNoticeVideoSource(noticeVideoUrl),
+    () =>
+      noticeVideoUrl === null
+        ? null
+        : resolveNoticeVideoSource(noticeVideoUrl),
     [noticeVideoUrl],
   );
+
+  const youtubeEmbedSrc = useMemo(() => {
+    if (videoSource?.kind !== "youtube") return "";
+    try {
+      const url = new URL(videoSource.embedSrc);
+      url.searchParams.set("origin", window.location.origin);
+      return url.toString();
+    } catch {
+      return videoSource.embedSrc;
+    }
+  }, [videoSource]);
 
   const updateReachedBottom = () => {
     const el = scrollRef.current;
@@ -72,9 +87,14 @@ export const VisitorNoticeDialog = ({
                 "",
             );
           }
+        } else if (showVideo && !cancelled) {
+          setNoticeVideoUrl("");
         }
       } catch {
-        if (!cancelled) setContent("無法載入訪客須知，請洽現場人員。");
+        if (!cancelled) {
+          setContent("無法載入訪客須知，請洽現場人員。");
+          if (showVideo) setNoticeVideoUrl("");
+        }
       } finally {
         if (!cancelled) setFetching(false);
       }
@@ -95,7 +115,11 @@ export const VisitorNoticeDialog = ({
   }, [fetching, content.length, showVideo, videoAvailable]);
 
   useEffect(() => {
-    if (!showVideo || !videoAvailable || videoSource.kind !== "file") return;
+    setVideoAvailable(true);
+  }, [videoSource]);
+
+  useEffect(() => {
+    if (!showVideo || !videoAvailable || videoSource?.kind !== "file") return;
     const video = videoRef.current;
     if (!video) return;
     void video.play().catch(() => {
@@ -127,20 +151,22 @@ export const VisitorNoticeDialog = ({
           className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-4"
           onScroll={updateReachedBottom}
         >
-          {showVideo ? (
+          {showVideo && videoSource ? (
             videoAvailable ? (
               <div className="overflow-hidden rounded-xl bg-slate-900">
                 {videoSource.kind === "youtube" ? (
                   <iframe
+                    key={youtubeEmbedSrc}
                     className="aspect-video w-full bg-black"
-                    src={videoSource.embedSrc}
+                    src={youtubeEmbedSrc}
                     title="訪客須知影片"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                     allowFullScreen
                     referrerPolicy="strict-origin-when-cross-origin"
                   />
                 ) : (
                   <video
+                    key={videoSource.src}
                     ref={videoRef}
                     className="aspect-video w-full bg-black"
                     controls

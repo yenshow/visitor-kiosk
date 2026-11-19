@@ -21,9 +21,9 @@ export type VisitorVisit = {
   plateNo: string;
   companyName: string;
   receptionistName: string;
-  /** YSCP 來訪事由代碼；施工＝4，跨日返回須知影片用 */
+  /** 來訪事由代碼；施工＝4，跨日返回須知影片用 */
   visitReasonType?: number;
-  /** 來訪截止（與 YSCP 報到 visitEndTime 一致） */
+  /** 來訪截止（通常＝預約結束時間） */
   visitEndTime?: string;
   checkinAt: string;
   tempOutAt?: string;
@@ -242,41 +242,10 @@ export const isDepartedToday = (
   return Boolean(day && day === today);
 };
 
-export type ExitCandidate = {
-  reason: "temp_out" | "departed";
-  plateNo: string;
-  at: string;
-};
-
-export const exitCandidates = (visits: VisitorVisit[]): ExitCandidate[] => {
-  const out: ExitCandidate[] = [];
-  for (const visit of visits) {
-    if (visit.status === "temp_out" && visit.tempOutAt) {
-      out.push({
-        reason: "temp_out",
-        plateNo: visit.plateNo,
-        at: visit.tempOutAt,
-      });
-      continue;
-    }
-    if (visit.status === "departed" && visit.departedAt) {
-      out.push({
-        reason: "departed",
-        plateNo: visit.plateNo,
-        at: visit.departedAt,
-      });
-    }
-  }
-  return out;
-};
-
-/**
- * 讀取本機 visits。
- * 正式離場只經 markDeparted；不依 YSCP 在廠清單自動改狀態（避免同步延遲誤標）。
- */
+/** 讀取本機 visits。正式離場只經 markDeparted。 */
 export const getVisitStore = async (): Promise<VisitStore> => readStore();
 
-/** 本機 visit → 在廠列（YSCP 清單缺漏時補齊統計／查詢） */
+/** 本機 visit → 在場列（統計／查詢） */
 export const visitToRegisterRecord = (
   visit: VisitorVisit,
 ): FlatRegisterRecord => ({
@@ -348,16 +317,7 @@ export const markDeparted = async (entry: VisitFieldsInput): Promise<void> => {
   }));
 };
 
-/** 清所有離場；臨時外出改回在場；保留在場完整欄位 */
+/** 清空本機訪客紀錄：在場、臨時外出、離場一併歸零 */
 export const resetPresenceStats = async (): Promise<void> => {
-  const store = await readStore();
-  await writeStore({
-    visits: store.visits
-      .filter((item) => item.status !== "departed")
-      .map((item) =>
-        item.status === "temp_out"
-          ? { ...item, status: "on_site" as const, tempOutAt: undefined }
-          : item,
-      ),
-  });
+  await writeStore(emptyStore());
 };

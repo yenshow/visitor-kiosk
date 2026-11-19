@@ -1,14 +1,12 @@
-import {
-  createAppointment,
-  getAutomaticApproval,
-} from "@/lib/yscp/visitor-api";
+import { createLocalAppointment } from "@/lib/kiosk/appointments";
 import {
   jsonError,
   jsonOk,
   taipeiDateKeyFromIso,
   toTaipeiDateKey,
 } from "@/lib/kiosk/api-helpers";
-import { notifyApproversOfPendingAppointment } from "@/lib/kiosk/approver-mail";
+import { notifyApproversOfAppointment } from "@/lib/kiosk/approver-mail";
+import { requireVisitorLicense } from "@/lib/license/gate";
 import { normalizePhoneDigits, normalizePlateNo } from "@/lib/kiosk/normalize";
 import { isValidEmail } from "@/lib/kiosk/visitor-fields";
 
@@ -29,6 +27,9 @@ type AppointBody = {
 };
 
 export const POST = async (request: Request) => {
+  const denied = await requireVisitorLicense();
+  if (denied) return denied;
+
   try {
     const body = (await request.json()) as AppointBody;
 
@@ -72,8 +73,9 @@ export const POST = async (request: Request) => {
       return jsonError("現場預約僅限當日，不可跨日");
     }
 
-    const result = await createAppointment({
+    const item = await createLocalAppointment({
       receptionistId,
+      receptionistName,
       appointStartTime,
       appointEndTime,
       visitReasonType,
@@ -89,34 +91,29 @@ export const POST = async (request: Request) => {
       },
     });
 
-    if (Array.isArray(result.watchListInfo) && result.watchListInfo.length > 0) {
-      return jsonError("預約需現場人員協助處理，請洽接待櫃台", 409);
-    }
+    const appointCode = String(item.appointCode ?? "").trim();
+    const waitingMessage = appointCode
+      ? `預約已完成。請至「訪客報到」輸入手機或預約碼 ${appointCode}。`
+      : "預約已完成。請至「訪客報到」輸入手機號碼。";
 
-    const automaticApproval = await getAutomaticApproval();
-    const waitingMessage =
-      automaticApproval === 1
-        ? "預約已送出，系統審核中。確認完成後將提供預約密碼，請再使用「訪客報到」。"
-        : "預約已送出，請等待內部人員確認。確認完成後將由系統提供預約密碼，再使用「訪客報到」。";
-
-    if (automaticApproval !== 1) {
-      void notifyApproversOfPendingAppointment({
-        visitorFamilyName,
-        visitorGivenName,
-        companyName,
-        phoneNo,
-        email,
-        plateNo: plateNo || "",
-        visitReasonType,
-        appointStartTime,
-        appointEndTime,
-        receptionistName,
-        orgLabel,
-      });
-    }
+    void notifyApproversOfAppointment({
+      visitorFamilyName,
+      visitorGivenName,
+      companyName,
+      phoneNo,
+      email,
+      plateNo: plateNo || "",
+      visitReasonType,
+      appointStartTime,
+      appointEndTime,
+      receptionistName: item.receptionistName ?? receptionistName,
+      orgLabel,
+      appointCode,
+    });
 
     return jsonOk({
       waitingMessage,
+      appointCode,
     });
   } catch (error) {
     return jsonError(

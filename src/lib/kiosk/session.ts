@@ -1,5 +1,5 @@
 import { randomBytes } from "crypto";
-import type { AppointmentItem } from "@/lib/yscp/visitor-api";
+import type { AppointmentItem } from "@/lib/kiosk/visitor";
 
 type SessionEntry = {
   item: AppointmentItem;

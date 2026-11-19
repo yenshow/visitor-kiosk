@@ -20,6 +20,12 @@
     <Color x:Key="StatusBgColor">#33001828</Color>
     <Color x:Key="DividerColor">#40FFFFFF</Color>
     <Color x:Key="RowBgColor">#1AFFFFFF</Color>
+    <Color x:Key="SuccessBgColor">#4020A86A</Color>
+    <Color x:Key="SuccessBorderColor">#FF3DDC9A</Color>
+    <Color x:Key="SuccessTextColor">#FFB8F5D0</Color>
+    <Color x:Key="PendingBgColor">#40C47A20</Color>
+    <Color x:Key="PendingBorderColor">#FFE0A040</Color>
+    <Color x:Key="PendingTextColor">#FFFFE0B2</Color>
 
     <LinearGradientBrush x:Key="ShellGradientBrush" StartPoint="0,0" EndPoint="1,1">
       <GradientStop Color="{StaticResource ShellStartColor}" Offset="0"/>
@@ -40,6 +46,25 @@
     <SolidColorBrush x:Key="StatusBackgroundBrush" Color="{StaticResource StatusBgColor}"/>
     <SolidColorBrush x:Key="DividerBrush" Color="{StaticResource DividerColor}"/>
     <SolidColorBrush x:Key="RowBackgroundBrush" Color="{StaticResource RowBgColor}"/>
+    <SolidColorBrush x:Key="SuccessBackgroundBrush" Color="{StaticResource SuccessBgColor}"/>
+    <SolidColorBrush x:Key="SuccessBorderBrush" Color="{StaticResource SuccessBorderColor}"/>
+    <SolidColorBrush x:Key="SuccessTextBrush" Color="{StaticResource SuccessTextColor}"/>
+    <SolidColorBrush x:Key="PendingBackgroundBrush" Color="{StaticResource PendingBgColor}"/>
+    <SolidColorBrush x:Key="PendingBorderBrush" Color="{StaticResource PendingBorderColor}"/>
+    <SolidColorBrush x:Key="PendingTextBrush" Color="{StaticResource PendingTextColor}"/>
+
+    <Style x:Key="StatusBadge" TargetType="Border">
+      <Setter Property="CornerRadius" Value="4"/>
+      <Setter Property="Padding" Value="10,4"/>
+      <Setter Property="VerticalAlignment" Value="Center"/>
+      <Setter Property="HorizontalAlignment" Value="Right"/>
+    </Style>
+
+    <Style x:Key="StatusBadgeText" TargetType="TextBlock">
+      <Setter Property="FontSize" Value="12"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="TextOptions.TextFormattingMode" Value="Display"/>
+    </Style>
 
     <Style x:Key="SectionHeader" TargetType="TextBlock">
       <Setter Property="FontSize" Value="15"/>

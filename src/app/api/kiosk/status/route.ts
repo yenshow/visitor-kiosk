@@ -1,12 +1,8 @@
 import { jsonOk } from "@/lib/kiosk/api-helpers";
-import { getConfig } from "@/lib/config";
+import { isVisitorLicensed } from "@/lib/license/gate";
 
-/** YSCP 連線狀態（前端提示用；不回 host/port） */
+/** 授權狀態（前端提示用） */
 export const GET = async () => {
-  const config = getConfig();
-  const hasCredentials = Boolean(
-    config.yscp.accessKey && config.yscp.secretKey,
-  );
-
-  return jsonOk({ hasCredentials });
+  const licensed = await isVisitorLicensed();
+  return jsonOk({ licensed });
 };

@@ -1,0 +1,69 @@
+<Window x:Class="YsopKiosk.LicenseWizardWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="授權設定"
+        Width="640"
+        SizeToContent="Height"
+        MinWidth="560"
+        WindowStartupLocation="CenterOwner"
+        FontSize="14"
+        ResizeMode="NoResize"
+        Background="{StaticResource ShellGradientBrush}"
+        Foreground="{StaticResource TextPrimaryBrush}">
+  <StackPanel Margin="20">
+    <TextBlock Text="授權設定" FontSize="20" FontWeight="SemiBold"
+               Foreground="{StaticResource TextPrimaryBrush}"/>
+    <TextBlock FontSize="13" Margin="0,3,0,14"
+               Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"
+               Text="產品碼 YSOP-Kiosk／功能 visitor。啟用後寫入本機授權檔。"/>
+
+    <Border x:Name="BannerLicense" Padding="14,12" Margin="0,0,0,12"
+            CornerRadius="10" BorderThickness="1.5"
+            Background="{StaticResource PendingBackgroundBrush}"
+            BorderBrush="{StaticResource PendingBorderBrush}">
+      <StackPanel>
+        <TextBlock x:Name="TxtLicenseTitle" FontSize="16" FontWeight="Bold"
+                   Foreground="{StaticResource PendingTextBrush}"
+                   Text="尚未授權"/>
+        <TextBlock x:Name="TxtLicenseDetail" Margin="0,6,0,0" FontSize="13"
+                   TextWrapping="Wrap" LineHeight="20"
+                   Foreground="{StaticResource TextSecondaryBrush}"
+                   Text="請輸入 License Key 線上啟用，或使用離線請求／匯入。"/>
+      </StackPanel>
+    </Border>
+
+    <Border Padding="14,12"
+            Background="{StaticResource CardBackgroundBrush}"
+            BorderBrush="{StaticResource CardBorderBrush}"
+            BorderThickness="1" CornerRadius="10">
+      <StackPanel>
+        <TextBlock Style="{StaticResource SectionHeader}" Text="啟用／匯入"/>
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="110"/>
+            <ColumnDefinition Width="*"/>
+          </Grid.ColumnDefinitions>
+          <TextBlock Grid.Column="0" Style="{StaticResource FormLabel}"
+                     VerticalAlignment="Center" Text="License Key"/>
+          <TextBox Grid.Column="1" x:Name="TxtLicenseKey"
+                   Style="{StaticResource ThemedTextBox}"
+                   ToolTip="線上啟用用；已授權可留空。離線請用下方按鈕。"/>
+        </Grid>
+        <WrapPanel Margin="0,10,0,0">
+          <Button x:Name="BtnLicenseActivate" Content="線上啟用"
+                  MinWidth="120" Style="{StaticResource PrimaryButton}"
+                  Click="OnLicenseActivate"/>
+          <Button Content="產生離線請求檔" MinWidth="140"
+                  Click="OnLicenseOfflineRequest"/>
+          <Button Content="匯入離線回應檔" MinWidth="140"
+                  Click="OnLicenseOfflineImport"/>
+        </WrapPanel>
+      </StackPanel>
+    </Border>
+
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
+      <Button Content="關閉" MinWidth="100" Style="{StaticResource PrimaryButton}"
+              Click="OnClose"/>
+    </StackPanel>
+  </StackPanel>
+</Window>

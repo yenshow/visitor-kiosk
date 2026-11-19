@@ -1,8 +1,12 @@
-import { listOrgOptions } from "@/lib/yscp/org-api";
 import { jsonError, jsonOk } from "@/lib/kiosk/api-helpers";
+import { listOrgOptions } from "@/lib/kiosk/directory";
+import { requireVisitorLicense } from "@/lib/license/gate";
 
-/** GET：扁平部門清單（含路徑標籤，供下拉） */
+/** GET：扁平部門清單（供下拉） */
 export const GET = async () => {
+  const denied = await requireVisitorLicense();
+  if (denied) return denied;
+
   try {
     const orgs = await listOrgOptions();
     return jsonOk({ orgs });

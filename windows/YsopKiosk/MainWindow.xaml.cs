@@ -1,4 +1,6 @@
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media;
 
 namespace YsopKiosk;
 
@@ -9,7 +11,7 @@ public partial class MainWindow : Window
     private readonly KioskUiHost _ui;
     private TrayIconService? _tray;
     private bool _allowExit;
-    private bool _hasCredentials;
+    private bool _licensed;
 
     public MainWindow()
     {
@@ -51,9 +53,9 @@ public partial class MainWindow : Window
     {
         EnsureInstallHooks();
         await RefreshStatusAsync();
-        if (!_hasCredentials)
+        if (!_licensed)
         {
-            _tray?.ShowBalloon(AppBrand.ProductName, "尚未完成 YSCP 設定，請開啟主視窗設定。");
+            _tray?.ShowBalloon(AppBrand.ProductName, "尚未啟用產品授權，請開啟授權設定。");
             return;
         }
         try
@@ -93,8 +95,9 @@ public partial class MainWindow : Window
         var bridge = await YscpBridgeClient.RunAsync(_root, "status");
         if (!bridge.Ok)
         {
-            _hasCredentials = false;
-            TxtStatus.Text = running ? "服務運行中（設定讀取失敗）" : "請先完成 YSCP 設定";
+            _licensed = false;
+            TxtStatus.Text = running ? "服務運行中（設定讀取失敗）" : "請先完成授權設定";
+            ApplySetupBadges(licensed: false, listenPort: 3010, serial: null, method: null);
             BtnStartKiosk.IsEnabled = false;
             BtnStop.IsEnabled = running;
             BtnSetting.IsEnabled = running;
@@ -102,30 +105,82 @@ public partial class MainWindow : Window
             return;
         }
 
-        _hasCredentials = bridge.GetBool("hasCredentials");
-        if (!_hasCredentials)
+        _licensed = bridge.GetBool("licensed");
+        ApplySetupBadges(
+            _licensed,
+            bridge.GetInt("listenPort", 3010),
+            bridge.GetString("serialNumber"),
+            bridge.GetString("activationMethod"));
+
+        if (!_licensed)
         {
             TxtStatus.Text = running
-                ? "服務運行中 · 尚未完成 YSCP 設定"
-                : "尚未完成 YSCP 設定 — 請先開啟 YSCP 設定";
+                ? "服務運行中 · 尚未啟用產品授權"
+                : "尚未啟用產品授權 — 請開啟授權設定";
         }
         else
         {
-            TxtStatus.Text = running ? "服務運行中" : "已設定 · 服務已停止";
+            TxtStatus.Text = running ? "服務運行中" : "已授權 · 服務已停止";
         }
 
-        BtnStartKiosk.IsEnabled = _hasCredentials;
+        BtnStartKiosk.IsEnabled = _licensed;
         BtnStop.IsEnabled = running;
-        BtnSetting.IsEnabled = _hasCredentials;
+        BtnSetting.IsEnabled = _licensed;
         await UpdateTrayTooltipAsync();
+    }
+
+    private void ApplySetupBadges(bool licensed, int listenPort, string? serial, string? method)
+    {
+        var port = listenPort is >= 1 and <= 65535 ? listenPort : 3010;
+        ApplyBadge(BadgeService, TxtServiceBadge, true, $"埠 {port}", $"埠 {port}");
+        BtnOpenService.Content = "檢視／修改服務設定…";
+        CardService.BorderBrush = (System.Windows.Media.Brush)FindResource("CardBorderBrush");
+
+        ApplyBadge(BadgeLicense, TxtLicenseBadge, licensed, "✓ 已授權", "未授權");
+        BtnOpenLicense.Content = licensed ? "檢視授權…" : "開啟授權設定…";
+        CardLicense.BorderBrush = licensed
+            ? (System.Windows.Media.Brush)FindResource("SuccessBorderBrush")
+            : (System.Windows.Media.Brush)FindResource("CardBorderBrush");
+
+        if (licensed)
+        {
+            var sn = string.IsNullOrWhiteSpace(serial) ? "—" : serial.Trim();
+            var m = string.IsNullOrWhiteSpace(method) ? "" : $" · {method.Trim()}";
+            TxtLicenseHint.Text = $"已授權 visitor · SN {sn}{m}";
+            TxtLicenseHint.Foreground = (System.Windows.Media.Brush)FindResource("SuccessTextBrush");
+            TxtLicenseHint.FontWeight = FontWeights.SemiBold;
+        }
+        else
+        {
+            TxtLicenseHint.Text = "產品授權（YSOP-Kiosk／visitor）：線上啟用或離線匯入。";
+            TxtLicenseHint.Foreground = (System.Windows.Media.Brush)FindResource("TextMutedBrush");
+            TxtLicenseHint.FontWeight = FontWeights.Normal;
+        }
+    }
+
+    private static void ApplyBadge(Border badge, TextBlock label, bool ok, string okText, string pendingText)
+    {
+        label.Text = ok ? okText : pendingText;
+        if (ok)
+        {
+            badge.Background = (System.Windows.Media.Brush)badge.FindResource("SuccessBackgroundBrush");
+            badge.BorderBrush = (System.Windows.Media.Brush)badge.FindResource("SuccessBorderBrush");
+            label.Foreground = (System.Windows.Media.Brush)badge.FindResource("SuccessTextBrush");
+        }
+        else
+        {
+            badge.Background = (System.Windows.Media.Brush)badge.FindResource("PendingBackgroundBrush");
+            badge.BorderBrush = (System.Windows.Media.Brush)badge.FindResource("PendingBorderBrush");
+            label.Foreground = (System.Windows.Media.Brush)badge.FindResource("PendingTextBrush");
+        }
     }
 
     internal async Task StartKioskAsync(bool showErrors = true)
     {
-        if (!_hasCredentials)
+        if (!_licensed)
         {
             if (showErrors)
-                MessageBox.Show("請先完成 YSCP 設定。", AppBrand.ProductName, MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show("請先於授權設定啟用產品授權。", AppBrand.ProductName, MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
@@ -168,9 +223,9 @@ public partial class MainWindow : Window
 
     private async void OnOpenSetting(object sender, RoutedEventArgs e)
     {
-        if (!_hasCredentials)
+        if (!_licensed)
         {
-            MessageBox.Show("請先完成 YSCP 設定。", AppBrand.ProductName, MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show("請先於授權設定啟用產品授權。", AppBrand.ProductName, MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
         try
@@ -189,23 +244,41 @@ public partial class MainWindow : Window
         await RefreshStatusAsync();
     }
 
-    private async void OnOpenWizard(object sender, RoutedEventArgs e)
+    private async void OnOpenServiceWizard(object sender, RoutedEventArgs e)
     {
         var wiz = new SetupWizardWindow(_root) { Owner = this };
         wiz.ShowDialog();
         if (wiz.Applied)
-        {
-            _ui.CloseAll();
-            _kiosk.Stop();
-            try { await _kiosk.StartAsync(); }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"設定已儲存，但重啟服務失敗：{ex.Message}", AppBrand.ProductName,
-                    MessageBoxButton.OK, MessageBoxImage.Warning);
-            }
-            EnsureInstallHooks(showAutostartError: true);
-        }
+            await RestartAfterConfigAsync(startIfStopped: true);
         await RefreshStatusAsync();
+    }
+
+    private async void OnOpenLicenseWizard(object sender, RoutedEventArgs e)
+    {
+        var wiz = new LicenseWizardWindow(_root) { Owner = this };
+        wiz.ShowDialog();
+        if (wiz.Applied)
+            await RestartAfterConfigAsync(startIfStopped: false);
+        await RefreshStatusAsync();
+    }
+
+    private async Task RestartAfterConfigAsync(bool startIfStopped)
+    {
+        var wasRunning = await _kiosk.IsRunningAsync();
+        _ui.CloseAll();
+        _kiosk.Stop();
+        if (!wasRunning && !startIfStopped)
+        {
+            EnsureInstallHooks(showAutostartError: true);
+            return;
+        }
+        try { await _kiosk.StartAsync(); }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"設定已儲存，但重啟服務失敗：{ex.Message}", AppBrand.ProductName,
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        EnsureInstallHooks(showAutostartError: true);
     }
 
     private void EnsureInstallHooks(bool showAutostartError = false)

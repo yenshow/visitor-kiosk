@@ -6,7 +6,7 @@ import { DEFAULT_MARQUEE } from "@/lib/kiosk/ui-constants";
 
 type KioskShellProps = {
   children: ReactNode;
-  hasCredentials?: boolean;
+  licensed?: boolean;
   layout?: "home" | "flow";
   marquee?: string;
   logoUrl?: string;
@@ -38,7 +38,7 @@ const MarqueeBanner = ({ text }: { text: string }) => (
 
 export const KioskShell = ({
   children,
-  hasCredentials = true,
+  licensed = true,
   layout = "home",
   marquee,
   logoUrl,
@@ -61,13 +61,12 @@ export const KioskShell = ({
           isHome ? "pt-8 landscape:pt-12" : "py-3 landscape:py-4"
         }`}
       >
-        {!hasCredentials ? (
+        {!licensed ? (
           <div
-            className="rounded-2xl border border-red-300/70 bg-red-950/40 px-4 py-3 text-center text-base text-red-100"
+            className="mb-3 rounded-2xl border border-amber-300/70 bg-amber-950/40 px-4 py-3 text-center text-base text-amber-50"
             role="alert"
           >
-            尚未設定連線金鑰，無法連線 YSCP。請開啟「YSOP Kiosk
-            訪客系統」完成 YSCP 設定。
+            尚未授權訪客功能。請於桌面「YsopKiosk」完成授權後再使用預約與報到；簽退仍可使用。
           </div>
         ) : null}
 

@@ -1,4 +1,4 @@
-/** YSCP visitReasonType → Kiosk 顯示名稱 */
+/** visitReasonType → Kiosk 顯示名稱 */
 export const VISIT_REASON_OPTIONS = [
   { value: 0, label: "商務" },
   { value: 1, label: "培訓" },

@@ -41,7 +41,7 @@ export const taipeiDateKeyFromIso = (value: string): string => {
 
 /**
  * 報到查預約時段：前 30 日～後 30 日。
- * YSCP appointmentlist 必填時段；提早預約只要「來訪日」落在此窗口即可查到。
+ * 提早預約只要「來訪日」落在此窗口即可查到。
  */
 export const getAppointQueryRangeTaipei = (): {
   appointStartTime: string;
@@ -63,29 +63,6 @@ export const getAppointQueryRangeTaipei = (): {
   return {
     appointStartTime: `${startP.year}-${startP.month}-${startP.day}T00:00:00+08:00`,
     appointEndTime: `${endP.year}-${endP.month}-${endP.day}T23:59:59+08:00`,
-  };
-};
-
-/** 在廠查詢用時段：含前一日，避免跨日仍在廠漏查 */
-export const getVisitQueryRangeTaipei = (): {
-  visitStartTime: string;
-  visitEndTime: string;
-} => {
-  const end = new Date();
-  const start = new Date(end.getTime() - 24 * 60 * 60 * 1000);
-  const startP = taipeiParts(start, {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-  const endP = taipeiParts(end, {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-  return {
-    visitStartTime: `${startP.year}-${startP.month}-${startP.day}T00:00:00+08:00`,
-    visitEndTime: `${endP.year}-${endP.month}-${endP.day}T23:59:59+08:00`,
   };
 };
 

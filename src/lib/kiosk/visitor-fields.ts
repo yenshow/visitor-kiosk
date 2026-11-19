@@ -1,48 +1,12 @@
-/** YSCP OpenAPI 不接受空的姓或名；Kiosk／Web 二選一時寫入用此佔位 */
-export const YSCP_EMPTY_NAME = "-";
-
-export const toYscpVisitorNames = (info: {
-  visitorFamilyName?: string;
-  visitorGivenName?: string;
-}): { visitorFamilyName: string; visitorGivenName: string } => {
-  const family = String(info.visitorFamilyName ?? "").trim();
-  const given = String(info.visitorGivenName ?? "").trim();
-  return {
-    visitorFamilyName: family || YSCP_EMPTY_NAME,
-    visitorGivenName: given || YSCP_EMPTY_NAME,
-  };
-};
-
-/** 隱藏 YSCP 姓名佔位「-」（含組字後的 "test02 -"、"-蘇"） */
-const visibleNamePart = (value?: string): string => {
-  let text = String(value ?? "").trim();
-  if (!text || text === YSCP_EMPTY_NAME) return "";
-
-  // 前綴佔位（例如 "-蘇"）
-  if (text.startsWith(YSCP_EMPTY_NAME)) {
-    text = text.slice(YSCP_EMPTY_NAME.length).trim();
-  }
-  if (!text || text === YSCP_EMPTY_NAME) return "";
-
-  // 空白分隔的佔位 token（例如 "test02 -"、"- 蘇"）
-  text = text
-    .split(/\s+/)
-    .filter((part) => part !== YSCP_EMPTY_NAME)
-    .join(" ")
-    .trim();
-
-  return !text || text === YSCP_EMPTY_NAME ? "" : text;
-};
-
 export const displayVisitorName = (
   familyName?: string,
   givenName?: string,
   visitorName?: string,
 ): string => {
-  const family = visibleNamePart(familyName);
-  const given = visibleNamePart(givenName);
+  const family = String(familyName ?? "").trim();
+  const given = String(givenName ?? "").trim();
   if (family || given) return `${family}${given}`;
-  return visibleNamePart(visitorName) || "—";
+  return String(visitorName ?? "").trim() || "—";
 };
 
 export const isValidEmail = (value: string): boolean =>

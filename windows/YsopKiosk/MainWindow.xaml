@@ -21,7 +21,7 @@
                Text="{x:Static local:AppBrand.RoleTitle}"/>
     <TextBlock FontSize="13" Margin="0,3,0,14"
                Foreground="{StaticResource TextMutedBrush}"
-               Text="先完成 YSCP 設定，再啟動運行 · 關閉視窗後仍在系統匣"/>
+               Text="先完成產品授權再啟動運行 · 關閉視窗後仍在系統匣"/>
 
     <Border Background="{StaticResource StatusBackgroundBrush}"
             BorderBrush="{StaticResource DividerBrush}" BorderThickness="1"
@@ -31,17 +31,49 @@
                  Foreground="{StaticResource TextPrimaryBrush}"/>
     </Border>
 
-    <Border Margin="0,0,0,12" Padding="14,12"
+    <Border x:Name="CardLicense" Margin="0,0,0,12" Padding="14,12"
             Background="{StaticResource CardBackgroundBrush}"
             BorderBrush="{StaticResource CardBorderBrush}"
             BorderThickness="1" CornerRadius="10">
       <StackPanel>
-        <TextBlock Style="{StaticResource SectionHeader}" Text="1. YSCP 設定"/>
-        <TextBlock Style="{StaticResource FormHint}"
-                   Text="初次或換機：連線金鑰、Webhook、出口車道。"/>
-        <Button Content="開啟 YSCP 設定…" Margin="0,10,0,0"
+        <DockPanel LastChildFill="True" Margin="0,0,0,6">
+          <Border x:Name="BadgeLicense" Style="{StaticResource StatusBadge}" DockPanel.Dock="Right"
+                  Background="{StaticResource PendingBackgroundBrush}"
+                  BorderBrush="{StaticResource PendingBorderBrush}" BorderThickness="1">
+            <TextBlock x:Name="TxtLicenseBadge" Style="{StaticResource StatusBadgeText}"
+                       Foreground="{StaticResource PendingTextBrush}" Text="未授權"/>
+          </Border>
+          <TextBlock Style="{StaticResource SectionHeader}" Margin="0"
+                     VerticalAlignment="Center" Text="1. 授權設定"/>
+        </DockPanel>
+        <TextBlock x:Name="TxtLicenseHint" Style="{StaticResource FormHint}"
+                   Text="產品授權（YSOP-Kiosk／visitor）：線上啟用或離線匯入。"/>
+        <Button x:Name="BtnOpenLicense" Content="開啟授權設定…" Margin="0,10,0,0"
                 HorizontalAlignment="Left" MinWidth="180"
-                Style="{StaticResource PrimaryButton}" Click="OnOpenWizard"/>
+                Style="{StaticResource PrimaryButton}" Click="OnOpenLicenseWizard"/>
+      </StackPanel>
+    </Border>
+
+    <Border x:Name="CardService" Margin="0,0,0,12" Padding="14,12"
+            Background="{StaticResource CardBackgroundBrush}"
+            BorderBrush="{StaticResource CardBorderBrush}"
+            BorderThickness="1" CornerRadius="10">
+      <StackPanel>
+        <DockPanel LastChildFill="True" Margin="0,0,0,6">
+          <Border x:Name="BadgeService" Style="{StaticResource StatusBadge}" DockPanel.Dock="Right"
+                  Background="{StaticResource PendingBackgroundBrush}"
+                  BorderBrush="{StaticResource PendingBorderBrush}" BorderThickness="1">
+            <TextBlock x:Name="TxtServiceBadge" Style="{StaticResource StatusBadgeText}"
+                       Foreground="{StaticResource PendingTextBrush}" Text="預設 3010"/>
+          </Border>
+          <TextBlock Style="{StaticResource SectionHeader}" Margin="0"
+                     VerticalAlignment="Center" Text="2. 服務設定"/>
+        </DockPanel>
+        <TextBlock Style="{StaticResource FormHint}"
+                   Text="服務埠與管理員 IP（選用）。遠端開設定頁時請填管理員 IP。"/>
+        <Button x:Name="BtnOpenService" Content="開啟服務設定…" Margin="0,10,0,0"
+                HorizontalAlignment="Left" MinWidth="180"
+                Style="{StaticResource PrimaryButton}" Click="OnOpenServiceWizard"/>
       </StackPanel>
     </Border>
 
@@ -50,14 +82,14 @@
             BorderBrush="{StaticResource CardBorderBrush}"
             BorderThickness="1" CornerRadius="10">
       <StackPanel>
-        <TextBlock Style="{StaticResource SectionHeader}" Text="2. 運行"/>
+        <TextBlock Style="{StaticResource SectionHeader}" Text="3. 運行"/>
         <TextBlock Style="{StaticResource FormHint}"
-                   Text="設定完成後啟動服務。"/>
+                   Text="授權完成後即可啟動訪客服務。"/>
         <WrapPanel Margin="0,10,0,0">
           <Button x:Name="BtnStartKiosk" Content="啟動服務" MinWidth="128"
                   Style="{StaticResource PrimaryButton}" Click="OnStartKiosk"/>
           <Button x:Name="BtnStop" Content="停止服務" MinWidth="120" Click="OnStop"/>
-          <Button x:Name="BtnSetting" Content="服務設定" MinWidth="128" Click="OnOpenSetting"/>
+          <Button x:Name="BtnSetting" Content="畫面設定" MinWidth="128" Click="OnOpenSetting"/>
         </WrapPanel>
       </StackPanel>
     </Border>

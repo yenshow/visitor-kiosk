@@ -33,7 +33,6 @@ export const parseAdminIps = (raw?: string): string[] => {
 
 /**
  * 客戶端 IP：with-client-ip 注入的 x-real-ip → x-forwarded-for → 可選 fallback
- * （Next proxy 的 request.ip／開發時連線位址）
  */
 export const getClientIp = (
   headers: Headers,

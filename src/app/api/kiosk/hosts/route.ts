@@ -1,7 +1,11 @@
-import { searchHosts } from "@/lib/yscp/org-api";
 import { jsonError, jsonOk } from "@/lib/kiosk/api-helpers";
+import { searchHosts } from "@/lib/kiosk/directory";
+import { requireVisitorLicense } from "@/lib/license/gate";
 
 export const POST = async (request: Request) => {
+  const denied = await requireVisitorLicense();
+  if (denied) return denied;
+
   try {
     const body = (await request.json()) as { orgIndexCode?: string };
     const orgIndexCode = String(body.orgIndexCode ?? "").trim();
@@ -10,7 +14,7 @@ export const POST = async (request: Request) => {
       return jsonError("請先選擇部門");
     }
 
-    const hosts = await searchHosts({ orgIndexCode });
+    const hosts = await searchHosts(orgIndexCode);
     return jsonOk({ hosts });
   } catch (error) {
     return jsonError(

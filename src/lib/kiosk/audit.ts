@@ -4,6 +4,10 @@ import { toTaipeiIso } from "@/lib/kiosk/api-helpers";
 
 const MAX_BYTES = 2 * 1024 * 1024;
 
+/** 與 kiosk-presence.json 同目錄（cwd/data） */
+const DATA_DIR = path.join(process.cwd(), "data");
+const AUDIT_PATH = path.join(DATA_DIR, "audit.log");
+
 export type AuditResult = "ok" | "deny" | "error";
 
 export type AuditEntry = {
@@ -11,19 +15,6 @@ export type AuditEntry = {
   result: AuditResult;
   ip?: string;
   detail?: string;
-};
-
-/** portable：cwd=app → ../runtime；本機 dev：cwd=專案根 → ./runtime */
-const resolveAuditPath = async (): Promise<string> => {
-  const portable = path.join(process.cwd(), "..", "runtime");
-  const local = path.join(process.cwd(), "runtime");
-  try {
-    await mkdir(portable, { recursive: true });
-    return path.join(portable, "audit.log");
-  } catch {
-    await mkdir(local, { recursive: true });
-    return path.join(local, "audit.log");
-  }
 };
 
 const rotateIfNeeded = async (filePath: string) => {
@@ -36,11 +27,11 @@ const rotateIfNeeded = async (filePath: string) => {
   }
 };
 
-/** JSON Lines；不含個資／金鑰 */
+/** JSON Lines；不含個資／金鑰；與訪客紀錄同放 data/ */
 export const writeAudit = async (entry: AuditEntry): Promise<void> => {
   try {
-    const filePath = await resolveAuditPath();
-    await rotateIfNeeded(filePath);
+    await mkdir(DATA_DIR, { recursive: true });
+    await rotateIfNeeded(AUDIT_PATH);
     const line = JSON.stringify({
       at: toTaipeiIso(new Date()),
       action: entry.action,
@@ -50,7 +41,7 @@ export const writeAudit = async (entry: AuditEntry): Promise<void> => {
         ? { detail: String(entry.detail).slice(0, 200) }
         : {}),
     });
-    await appendFile(filePath, `${line}\n`, "utf8");
+    await appendFile(AUDIT_PATH, `${line}\n`, "utf8");
   } catch (error) {
     console.error(
       "[audit] 寫入失敗",

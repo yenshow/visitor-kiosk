@@ -1,6 +1,5 @@
-import { getConfig } from "@/lib/config";
-import { visitorCheckOut } from "@/lib/yscp/visitor-api";
 import { jsonError, jsonOk } from "@/lib/kiosk/api-helpers";
+import { markAppointmentCheckedOut } from "@/lib/kiosk/appointments";
 import {
   clearTempOut,
   markDeparted,
@@ -18,13 +17,11 @@ type CheckoutBody = {
   mode?: CheckoutMode;
 };
 
-const buildMessages = (
-  minutes: number,
-): Record<CheckoutMode, string> => ({
-  temp: `已登記臨時外出。當日返回請至「訪客報到」確認返回；若跨日至翌日，請再報到並同意訪客須知。請於 ${minutes} 分鐘內離場。`,
+const MESSAGES: Record<CheckoutMode, string> = {
+  temp: "已登記臨時外出。當日返回請至「訪客報到」確認返回；若跨日至翌日，請再報到並同意訪客須知。",
   return: "已確認返回，狀態恢復為在場。",
-  final: `正式簽退成功，人員通行權限已撤銷。請於 ${minutes} 分鐘內離場。`,
-});
+  final: "正式簽退成功。",
+};
 
 export const POST = async (request: Request) => {
   try {
@@ -50,8 +47,6 @@ export const POST = async (request: Request) => {
       companyName,
       receptionistName,
     } = session;
-    const exitGateMinutes = getConfig().yscp.exitGateMinutes;
-    const messages = buildMessages(exitGateMinutes);
 
     if (mode === "temp") {
       await markTempOut({
@@ -65,7 +60,6 @@ export const POST = async (request: Request) => {
     } else if (mode === "return") {
       await clearTempOut(appointRecordId);
     } else {
-      await visitorCheckOut(appointRecordId);
       await markDeparted({
         recordId: appointRecordId,
         visitorName,
@@ -74,12 +68,13 @@ export const POST = async (request: Request) => {
         companyName,
         receptionistName,
       });
+      await markAppointmentCheckedOut(appointRecordId);
     }
 
     consumeCheckoutToken(token);
     return jsonOk({
       mode,
-      message: messages[mode],
+      message: MESSAGES[mode],
     });
   } catch (error) {
     return jsonError(

@@ -1,6 +1,11 @@
 ; YSOP Kiosk — Inno Setup 6
 ; SetupIconFile = assets\YSOP.ico；桌面「YSOP Kiosk」= kiosk.ico
 ; pack-portable.ps1 產出 dist\YsopKiosk\ 後可呼叫 ISCC。
+;
+; 升級（對齊 YSOP／BA）：
+;   - app\.env 僅「不存在時」寫入（onlyifdoesntexist），保留現場 SMTP／授權平台等
+;   - 不安裝 app\data\*，保留授權檔、畫面設定、訪客紀錄等
+; CloseApplications=force：安裝時關閉占用檔案的程式
 
 #ifndef MyAppVersion
   #define MyAppVersion "1.0.0"
@@ -28,12 +33,19 @@ PrivilegesRequired=lowest
 ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayIcon={app}\kiosk.ico
 CloseApplications=force
+RestartApplications=no
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
+[Dirs]
+; 首次安裝建立資料目錄；升級不覆寫既有內容
+Name: "{app}\app\data"
+
 [Files]
-Source: "..\dist\YsopKiosk\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+; 遞迴複製；排除 .env 與 data（升級保留現場設定／授權／紀錄）
+Source: "..\dist\YsopKiosk\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "app\.env,app\data\*"
+Source: "..\dist\YsopKiosk\app\.env"; DestDir: "{app}\app"; Flags: onlyifdoesntexist ignoreversion
 
 [Icons]
 Name: "{autodesktop}\YSOP Kiosk"; Filename: "{app}\{#MyAppExe}"; WorkingDir: "{app}"; IconFilename: "{app}\kiosk.ico"; Comment: "{#MyAppName}"

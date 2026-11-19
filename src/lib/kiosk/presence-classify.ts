@@ -23,23 +23,12 @@ export const effectiveVisitEndTime = (
 export const classifyActivePresence = (input: {
   visit?: VisitorVisit;
   flat: FlatRegisterRecord;
-  /** 是否出現在本次 YSCP 在廠查詢結果 */
-  inYscpRegisterList: boolean;
 }): ActivePresenceBucket | null => {
   const status = input.visit?.status;
   if (status === "departed") return null;
 
   const endTime = effectiveVisitEndTime(input.flat, input.visit);
   if (isVisitPastEnd(endTime)) return "overstay";
-
-  // 僅本機殘留、又無可靠截止時間 → 視為殭屍在場
-  const localActive =
-    !input.inYscpRegisterList &&
-    (status === "on_site" || status === "temp_out");
-  if (localActive && !Number.isFinite(Date.parse(endTime))) {
-    return "overstay";
-  }
-
   if (status === "temp_out") return "temp_out";
   return "on_site";
 };

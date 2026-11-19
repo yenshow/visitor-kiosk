@@ -23,7 +23,10 @@ npm-debug.log*
 
 # YSOP 現場狀態／設定（運行時寫入）
 /data/kiosk-presence.json
+/data/kiosk-appointments.json
+/data/kiosk-directory.json
 /data/kiosk-settings.json
+/data/kiosk-license.json
 /data/kiosk-logo.*
 
 # env files（本機／現場金鑰；pack 只寫入空白樣板，不含建置機金鑰）

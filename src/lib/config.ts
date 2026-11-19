@@ -1,18 +1,6 @@
-import {
-  parseExitLanes,
-  type ExitLane,
-} from "@/lib/kiosk/exit-lanes";
-import { EXIT_GATE_MINUTES_DEFAULT } from "@/lib/kiosk/ui-constants";
+import { LICENSE_PLATFORM_API_DEFAULT } from "@/lib/license/constants";
 
-export const YSCP_HTTPS_PORT = 443;
-export const YSCP_TIMEOUT_MS = 30_000;
-export const YSCP_GATE_DEDUP_MS = 5_000;
-/** 開閘後維持繼電器致能再送關閉（API 無自動脈衝） */
-export const YSCP_RELAY_HOLD_MS = 2_000;
 export const KIOSK_LISTEN_PORT_DEFAULT = 3010;
-export const YSCP_EVENT_WEBHOOK_PATH = "/api/yscp/events";
-/** 區網推送用 HTTP：YSCP 對 kiosk 自簽 HTTPS 常 SSL Handshake Failure */
-export const YSCP_EVENT_DEST_SCHEME = "http";
 
 export const getKioskListenPort = (): number => {
   const n = Number(String(process.env.PORT ?? "").trim());
@@ -20,42 +8,7 @@ export const getKioskListenPort = (): number => {
   return KIOSK_LISTEN_PORT_DEFAULT;
 };
 
-export const buildYscpEventDest = (host: string, port?: number): string => {
-  const listenPort = port ?? getKioskListenPort();
-  return `${YSCP_EVENT_DEST_SCHEME}://${host}:${listenPort}${YSCP_EVENT_WEBHOOK_PATH}`;
-};
-
 const env = (key: string): string => String(process.env[key] ?? "").trim();
-
-/** 允許 `192.168.2.2` 或 `192.168.2.2:443` */
-const parseYscpHost = (
-  raw: string,
-): { hostname: string; port?: number } => {
-  const cleaned = String(raw ?? "")
-    .trim()
-    .replace(/^https?:\/\//i, "")
-    .split("/")[0];
-
-  if (!cleaned) return { hostname: "127.0.0.1" };
-
-  const [hostname, portPart] = cleaned.split(":");
-  const port = portPart ? Number(portPart) : undefined;
-  return {
-    hostname: hostname || "127.0.0.1",
-    port: Number.isFinite(port) && port && port > 0 ? port : undefined,
-  };
-};
-
-const IPV4_RE = /^(?:\d{1,3}\.){3}\d{1,3}$/;
-
-/** 防火牆來源＝YSCP_HOST 的 IPv4（可含 :埠） */
-export const extractYscpHostIpv4 = (raw: string): string => {
-  const { hostname } = parseYscpHost(raw);
-  if (!IPV4_RE.test(hostname)) return "";
-  const parts = hostname.split(".").map(Number);
-  if (parts.some((n) => !Number.isFinite(n) || n < 0 || n > 255)) return "";
-  return hostname;
-};
 
 export const SMTP_HOST_DEFAULT = "smtp.office365.com";
 export const SMTP_PORT_DEFAULT = 587;
@@ -70,30 +23,29 @@ export type SmtpConfig = {
   configured: boolean;
 };
 
+export type LicenseConfig = {
+  /** 授權平台 API Base（至 /api/license 前綴），例如 https://api.yenshow.com/api/license */
+  platformApiBaseUrl: string;
+  platformTimeoutMs: number;
+  /** 離線授權回應檔 HMAC 驗簽金鑰（與 BA 同一套才能驗同平台檔） */
+  signSecret: string;
+  /** 開發／測試：略過本機授權狀態，視為 visitor 已授權 */
+  openAllFeatures: boolean;
+};
+
 export type AppConfig = {
-  yscp: {
-    hostname: string;
-    port: number;
-    baseUrl: string;
-    accessKey: string;
-    secretKey: string;
-    /** 內網 YSCP 常為自簽；固定略過憑證驗證 */
-    rejectUnauthorized: boolean;
-    timeoutMs: number;
-    eventDest: string;
-    eventToken: string;
-    exitLanes: ExitLane[];
-    gateDedupMs: number;
-    /** 離場開閘時限（分鐘） */
-    exitGateMinutes: number;
-    /** 防火牆用：取自 YSCP_HOST 的 IPv4 */
-    firewallSourceIp: string;
-  };
   kiosk: {
     listenPort: number;
     adminIps: string;
   };
   smtp: SmtpConfig;
+  license: LicenseConfig;
+};
+
+/** `1` / `true` / `yes` → true */
+const envFlagTrue = (key: string): boolean => {
+  const v = env(key).toLowerCase();
+  return v === "1" || v === "true" || v === "yes";
 };
 
 const parsePositiveInt = (raw: string, fallback: number): number => {
@@ -103,33 +55,11 @@ const parsePositiveInt = (raw: string, fallback: number): number => {
 };
 
 export const getConfig = (): AppConfig => {
-  const parsed = parseYscpHost(env("YSCP_HOST") || "127.0.0.1");
-  const port = parsed.port ?? YSCP_HTTPS_PORT;
-  const hostname = parsed.hostname;
-
   const smtpUser = env("SMTP_USER");
   const smtpPass = env("SMTP_PASS");
   const smtpFrom = env("MAIL_FROM") || smtpUser;
 
   return {
-    yscp: {
-      hostname,
-      port,
-      baseUrl: `https://${hostname}${port === 443 ? "" : `:${port}`}`,
-      accessKey: env("YSCP_AK"),
-      secretKey: env("YSCP_SK"),
-      rejectUnauthorized: false,
-      timeoutMs: YSCP_TIMEOUT_MS,
-      eventDest: env("YSCP_EVENT_DEST"),
-      eventToken: env("YSCP_EVENT_TOKEN"),
-      exitLanes: parseExitLanes(env("YSCP_EXIT_LANES")),
-      gateDedupMs: YSCP_GATE_DEDUP_MS,
-      exitGateMinutes: parsePositiveInt(
-        env("YSCP_EXIT_GATE_MINUTES"),
-        EXIT_GATE_MINUTES_DEFAULT,
-      ),
-      firewallSourceIp: extractYscpHostIpv4(env("YSCP_HOST") || hostname),
-    },
     kiosk: {
       listenPort: getKioskListenPort(),
       adminIps: env("KIOSK_ADMIN_IPS"),
@@ -141,6 +71,16 @@ export const getConfig = (): AppConfig => {
       pass: smtpPass,
       from: smtpFrom,
       configured: Boolean(smtpUser && smtpPass),
+    },
+    license: {
+      platformApiBaseUrl:
+        env("LICENSE_PLATFORM_API_BASE_URL") || LICENSE_PLATFORM_API_DEFAULT,
+      platformTimeoutMs: parsePositiveInt(
+        env("LICENSE_PLATFORM_TIMEOUT_MS"),
+        10_000,
+      ),
+      signSecret: env("LICENSE_SIGN_SECRET"),
+      openAllFeatures: envFlagTrue("LICENSE_OPEN_ALL_FEATURES"),
     },
   };
 };

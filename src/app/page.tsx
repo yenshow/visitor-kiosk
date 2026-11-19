@@ -20,7 +20,7 @@ import {
 type Screen = "home" | "appoint" | "checkin" | "checkout";
 
 type StatusInfo = {
-  hasCredentials: boolean;
+  licensed?: boolean;
 };
 
 const STATS_POLL_MS = 20_000;
@@ -98,12 +98,13 @@ export default function HomePage() {
   }, [screen]);
 
   const showAppoint = settings?.showAppoint ?? true;
+  const licensed = status == null ? true : status.licensed !== false;
 
   return (
     <>
       <ThemeSync theme={settings?.theme} />
       <KioskShell
-        hasCredentials={status == null ? true : status.hasCredentials}
+        licensed={licensed}
         layout={screen === "home" ? "home" : "flow"}
         marquee={settings?.resolvedMarquee || DEFAULT_MARQUEE}
         logoUrl={settings?.logoUrl || "/yenshow-logo.svg"}
@@ -112,6 +113,7 @@ export default function HomePage() {
           <HomeActionCards
             stats={stats}
             showAppoint={showAppoint}
+            licensed={licensed}
             onCheckin={() => setScreen("checkin")}
             onCheckout={() => setScreen("checkout")}
             onAppoint={() => setScreen("appoint")}

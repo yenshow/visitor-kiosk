@@ -16,6 +16,7 @@ export type ApproverMailPayload = {
   appointEndTime: string;
   receptionistName: string;
   orgLabel: string;
+  appointCode?: string;
 };
 
 const formatTimeRange = (startIso: string, endIso: string): string => {
@@ -38,9 +39,7 @@ const buildTextBody = (payload: ApproverMailPayload): string => {
   );
   const reason = visitReasonLabel(payload.visitReasonType);
   const lines = [
-    "此為 YSOP Kiosk 訪客系統現場預約通知。",
-    "預約已寫入 YSCP，請至 YSCP 訪客預約功能完成核准。",
-    "（本信不含預約密碼；密碼請於核准後由 YSCP 提供給訪客。）",
+    "此為 YSOP Kiosk 訪客系統現場預約通知（已自動核准）。",
     "",
     `訪客姓名：${visitorName}`,
     `公司：${payload.companyName.trim() || "—"}`,
@@ -51,28 +50,28 @@ const buildTextBody = (payload: ApproverMailPayload): string => {
     `來訪時段：${formatTimeRange(payload.appointStartTime, payload.appointEndTime)}`,
     `被訪人：${payload.receptionistName.trim() || "—"}`,
     `部門：${payload.orgLabel.trim() || "—"}`,
+    `預約碼：${String(payload.appointCode ?? "").trim() || "—"}`,
   ];
   return lines.join("\n");
 };
 
 /**
- * 需人工核准時，一封信同步寄給設定頁核准名單。
+ * 現場預約完成後，可選通知設定頁信箱。
  * SMTP 未設定、名單為空、或寄信失敗時不 throw（不擋預約）。
  */
-export const notifyApproversOfPendingAppointment = async (
+export const notifyApproversOfAppointment = async (
   payload: ApproverMailPayload,
 ): Promise<void> => {
   try {
     const { smtp } = getConfig();
     if (!smtp.configured) {
-      console.warn("[approver-mail] SMTP 未設定，略過核准通知");
+      console.warn("[approver-mail] SMTP 未設定，略過預約通知");
       return;
     }
 
     const settings = await getSettings();
     const to = settings.approverEmails;
     if (to.length === 0) {
-      console.warn("[approver-mail] 核准名單為空，略過核准通知");
       return;
     }
 
@@ -81,7 +80,7 @@ export const notifyApproversOfPendingAppointment = async (
       payload.visitorGivenName,
     );
     const hostName = payload.receptionistName.trim() || "—";
-    const subject = `【訪客服務機】待核准預約：${visitorName}／${hostName}`;
+    const subject = `【訪客服務機】新預約：${visitorName}／${hostName}`;
 
     const transporter = nodemailer.createTransport({
       host: smtp.host,
@@ -105,7 +104,7 @@ export const notifyApproversOfPendingAppointment = async (
     });
   } catch (error) {
     console.error(
-      "[approver-mail] 寄送核准通知失敗",
+      "[approver-mail] 寄送預約通知失敗",
       error instanceof Error ? error.message : error,
     );
   }

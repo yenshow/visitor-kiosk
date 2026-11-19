@@ -16,7 +16,7 @@ export type KioskSettings = {
   logoFileName: string;
   /** 訪客須知影片：YouTube／影片網址／路徑；空＝/notice.mp4 */
   noticeVideoUrl: string;
-  /** 現場預約待核准時同步通知的信箱（空＝不寄） */
+  /** 現場預約完成時可選通知的信箱（空＝不寄） */
   approverEmails: string[];
 };
 

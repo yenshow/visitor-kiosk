@@ -9,7 +9,7 @@ import {
 const ADMIN_API_EXACT = new Set([
   "/api/kiosk/records",
   "/api/kiosk/records/reset",
-  "/api/kiosk/yscp/subscribe",
+  "/api/kiosk/directory",
 ]);
 
 const isAdminPath = (pathname: string, method: string): boolean => {
@@ -25,8 +25,8 @@ export const proxy = (request: NextRequest) => {
   const method = request.method.toUpperCase();
   if (!isAdminPath(pathname, method)) return NextResponse.next();
 
-  // NextRequest.ip：dev／部分 runtime 有；portable 靠 with-client-ip 的 x-real-ip
-  const ip = getClientIp(request.headers, request.ip);
+  // portable：with-client-ip 注入 x-real-ip；本機 dev 可依 Host 判定
+  const ip = getClientIp(request.headers);
   const adminIps = parseAdminIps(process.env.KIOSK_ADMIN_IPS);
   const allowed =
     isLoopbackIp(ip) ||
@@ -56,6 +56,6 @@ export const config = {
     "/api/kiosk/settings/logo",
     "/api/kiosk/records",
     "/api/kiosk/records/reset",
-    "/api/kiosk/yscp/subscribe",
+    "/api/kiosk/directory",
   ],
 };

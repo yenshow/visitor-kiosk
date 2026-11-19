@@ -12,6 +12,13 @@ public partial class App : Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
+        // 提升後的防火牆寫入：不進單實例／UI
+        if (FirewallHelper.TryHandleCli(e.Args, out var fwExit))
+        {
+            Environment.Exit(fwExit);
+            return;
+        }
+
         base.OnStartup(e);
 
         if (!SingleInstance.TryBecomePrimary(out _mutex))

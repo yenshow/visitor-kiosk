@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { DirectoryDialog } from "@/components/kiosk/DirectoryDialog";
 import { RecordsDialog } from "@/components/kiosk/RecordsDialog";
 import {
   applyThemeClass,
@@ -25,9 +32,9 @@ type SettingsFormProps = {
 };
 
 const RESET_DESC =
-  "清除所有離場累計，並取消本機臨時外出標記；保留在場訪客完整資料。不影響 YSCP 在廠狀態。";
+  "清空本機訪客紀錄：目前在場、臨時外出、離場人數都會歸零。部門與被訪人、未報到的預約不受影響。";
 
-const LABEL = "mb-2 block text-base font-medium text-slate-700";
+const LABEL = "text-base font-medium text-slate-700";
 const FIELD =
   "w-full rounded-xl border border-slate-300 bg-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30";
 const BTN =
@@ -36,7 +43,8 @@ const BTN_DARK = `${BTN} bg-slate-800 text-white active:bg-slate-700`;
 const BTN_OUTLINE = `${BTN} border border-slate-300 bg-white text-slate-700 active:bg-slate-100`;
 const BTN_WARN = `${BTN} border border-amber-400 bg-white text-amber-900 active:bg-amber-100`;
 const BTN_DANGER = `${BTN} bg-red-600 text-white active:bg-red-700`;
-const HINT = "mt-2 text-sm text-slate-500";
+const HINT = "text-sm font-normal text-slate-500";
+const LABEL_ROW = "mb-2 flex flex-wrap items-baseline gap-x-2 gap-y-0.5";
 
 const THEME_OPTIONS = [
   {
@@ -88,7 +96,9 @@ export const SettingsForm = ({ initial, onSaved }: SettingsFormProps) => {
   const [theme, setTheme] = useState<KioskTheme>(
     initial?.theme === "dark" ? "dark" : "light",
   );
-  const [logoUrl, setLogoUrl] = useState(initial?.logoUrl ?? "/yenshow-logo.svg");
+  const [logoUrl, setLogoUrl] = useState(
+    initial?.logoUrl ?? "/yenshow-logo.svg",
+  );
   const [hasCustomLogo, setHasCustomLogo] = useState(
     initial?.hasCustomLogo ?? false,
   );
@@ -97,6 +107,7 @@ export const SettingsForm = ({ initial, onSaved }: SettingsFormProps) => {
   const [resetting, setResetting] = useState(false);
   const [resetConfirm, setResetConfirm] = useState(false);
   const [recordsOpen, setRecordsOpen] = useState(false);
+  const [directoryOpen, setDirectoryOpen] = useState(false);
   const [error, setError] = useState("");
   const [savedHint, setSavedHint] = useState("");
   const [recordsReload, setRecordsReload] = useState(0);
@@ -213,7 +224,10 @@ export const SettingsForm = ({ initial, onSaved }: SettingsFormProps) => {
   return (
     <div className="w-full space-y-6">
       <div>
-        <span className={LABEL}>公司 Logo</span>
+        <div className={LABEL_ROW}>
+          <span className={LABEL}>公司 Logo</span>
+          <span className={HINT}>支援 PNG／JPG／SVG／WebP，上限 2MB</span>
+        </div>
         <div className="flex flex-wrap items-center gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
           {/* 動態自訂 Logo URL，不適合 next/image 靜態優化 */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -264,11 +278,10 @@ export const SettingsForm = ({ initial, onSaved }: SettingsFormProps) => {
             }}
           />
         </div>
-        <p className={HINT}>支援 PNG／JPG／SVG／WebP，上限 2MB</p>
       </div>
 
       <label className="block">
-        <span className={LABEL}>跑馬燈文字</span>
+        <span className={`mb-2 block ${LABEL}`}>跑馬燈文字</span>
         <textarea
           className={`${FIELD} min-h-28 px-4 py-3 text-lg`}
           value={marquee}
@@ -280,7 +293,12 @@ export const SettingsForm = ({ initial, onSaved }: SettingsFormProps) => {
       </label>
 
       <label className="block">
-        <span className={LABEL}>訪客須知影片</span>
+        <span className={LABEL_ROW}>
+          <span className={LABEL}>訪客須知影片</span>
+          <span className={HINT}>
+            支援 YouTube、直接影片網址，或本機路徑（如 /notice.mp4）
+          </span>
+        </span>
         <input
           type="url"
           className={`${FIELD} min-h-12 px-4 py-3 text-lg`}
@@ -290,13 +308,10 @@ export const SettingsForm = ({ initial, onSaved }: SettingsFormProps) => {
           placeholder="留空＝/notice.mp4；可填 YouTube 或影片網址"
           aria-label="訪客須知影片網址"
         />
-        <p className={HINT}>
-          支援 YouTube、直接影片網址，或本機路徑（如 /notice.mp4）
-        </p>
       </label>
 
       <div>
-        <span className={LABEL}>顯示模式</span>
+        <span className={`mb-2 block ${LABEL}`}>顯示模式</span>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <button
             type="button"
@@ -361,39 +376,50 @@ export const SettingsForm = ({ initial, onSaved }: SettingsFormProps) => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div>
-          <h3 className={LABEL}>訪客紀錄</h3>
-          <button
-            type="button"
-            className={`${BTN_DARK} w-full`}
-            aria-label="開啟訪客紀錄"
-            aria-haspopup="dialog"
-            onClick={() => {
-              clearStatus();
-              setRecordsOpen(true);
-            }}
-          >
-            查看訪客紀錄
-          </button>
-        </div>
-        <div>
-          <h3 className={LABEL}>重置統計</h3>
-          <button
-            type="button"
-            className={`${BTN_WARN} w-full`}
-            aria-label="重置訪客統計"
-            aria-haspopup="dialog"
-            disabled={resetting || uploading || saving}
-            onClick={() => {
-              clearStatus();
-              setResetConfirm(true);
-            }}
-          >
-            重置統計與紀錄
-          </button>
-        </div>
+      <div className="grid grid-cols-3 gap-3">
+        <button
+          type="button"
+          className={`${BTN_DARK} w-full px-2 sm:px-4`}
+          aria-label="開啟部門與被訪人"
+          aria-haspopup="dialog"
+          onClick={() => {
+            clearStatus();
+            setDirectoryOpen(true);
+          }}
+        >
+          部門與被訪人
+        </button>
+        <button
+          type="button"
+          className={`${BTN_DARK} w-full px-2 sm:px-4`}
+          aria-label="開啟訪客紀錄"
+          aria-haspopup="dialog"
+          onClick={() => {
+            clearStatus();
+            setRecordsOpen(true);
+          }}
+        >
+          訪客紀錄
+        </button>
+        <button
+          type="button"
+          className={`${BTN_WARN} w-full px-2 sm:px-4`}
+          aria-label="重置訪客統計"
+          aria-haspopup="dialog"
+          disabled={resetting || uploading || saving}
+          onClick={() => {
+            clearStatus();
+            setResetConfirm(true);
+          }}
+        >
+          重置統計
+        </button>
       </div>
+
+      <DirectoryDialog
+        open={directoryOpen}
+        onClose={() => setDirectoryOpen(false)}
+      />
 
       <RecordsDialog
         open={recordsOpen}

@@ -73,6 +73,7 @@ export const AppointForm = ({ idleSeconds, onHome }: AppointFormProps) => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           receptionistId: selectedHost.personId,
+          receptionistName: selectedHost.personName,
           appointStartTime: toTaipeiIsoFromTodayTime(startAt),
           appointEndTime: toTaipeiIsoFromTodayTime(endAt),
           visitReasonType: reasonType,
@@ -95,7 +96,7 @@ export const AppointForm = ({ idleSeconds, onHome }: AppointFormProps) => {
       }
       setWaitingMessage(
         json.data?.waitingMessage ||
-          "預約已送出，請等待內部確認。確認完成後將由系統提供預約密碼，再使用訪客報到。",
+          "預約已完成。請至「訪客報到」輸入手機或預約碼。",
       );
     } catch {
       setError("送出預約失敗");
@@ -107,10 +108,10 @@ export const AppointForm = ({ idleSeconds, onHome }: AppointFormProps) => {
   if (waitingMessage) {
     return (
       <div className="mx-auto flex w-full max-w-2xl flex-col items-center rounded-3xl bg-white p-10 shadow-xl">
-        <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-amber-700">
-          審核中
+        <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-emerald-700">
+          已完成
         </p>
-        <h2 className="text-3xl font-bold text-slate-900">等待內部確認</h2>
+        <h2 className="text-3xl font-bold text-slate-900">預約完成</h2>
         <p className="mt-4 text-center text-xl leading-8 text-slate-700">
           {waitingMessage}
         </p>

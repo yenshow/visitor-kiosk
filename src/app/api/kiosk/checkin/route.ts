@@ -1,5 +1,6 @@
-import { reapplyAuth, registerCheckIn } from "@/lib/yscp/visitor-api";
 import { jsonError, jsonOk, toTaipeiIso } from "@/lib/kiosk/api-helpers";
+import { markAppointmentCheckedIn } from "@/lib/kiosk/appointments";
+import { requireVisitorLicense } from "@/lib/license/gate";
 import { normalizePhoneDigits, normalizePlateNo } from "@/lib/kiosk/normalize";
 import { upsertVisitOnCheckin } from "@/lib/kiosk/presence";
 import {
@@ -14,6 +15,9 @@ type CheckinBody = {
 };
 
 export const POST = async (request: Request) => {
+  const denied = await requireVisitorLicense();
+  if (denied) return denied;
+
   try {
     const body = (await request.json()) as CheckinBody;
 
@@ -43,24 +47,11 @@ export const POST = async (request: Request) => {
     const phoneNo = normalizePhoneDigits(info?.phoneNo ?? "");
     const plateNo = normalizePlateNo(info?.plateNo);
 
-    const result = await registerCheckIn({
-      appointId,
-      visitorId,
-      visitStartTime,
-      visitEndTime,
-      visitPurposeType: Number.isFinite(visitPurposeType)
-        ? visitPurposeType
-        : 0,
-      visitorInfo: {
-        ...info,
-        ...(plateNo ? { plateNo } : {}),
-      },
-    });
-
+    await markAppointmentCheckedIn(appointId);
     consumeCheckinToken(token);
 
     await upsertVisitOnCheckin({
-      recordId: String(result.appointRecordId ?? "").trim(),
+      recordId: appointId,
       visitorId,
       appointId,
       visitorName: displayVisitorName(
@@ -77,8 +68,6 @@ export const POST = async (request: Request) => {
         : undefined,
       visitEndTime,
     });
-
-    void reapplyAuth(visitorId).catch(() => undefined);
 
     return jsonOk({});
   } catch (error) {

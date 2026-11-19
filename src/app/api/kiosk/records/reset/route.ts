@@ -3,7 +3,7 @@ import { guardAdminAction } from "@/lib/kiosk/admin-guard";
 import { writeAudit } from "@/lib/kiosk/audit";
 import { resetPresenceStats } from "@/lib/kiosk/presence";
 
-/** POST：清離場累計、取消臨時外出；保留在場 */
+/** POST：清空本機訪客紀錄（在場／外出／離場） */
 export const POST = async (request: Request) => {
   const { ip, denied } = await guardAdminAction(request, "records.reset");
   if (denied) return denied;
@@ -13,7 +13,7 @@ export const POST = async (request: Request) => {
     await writeAudit({ action: "records.reset", result: "ok", ip });
     return jsonOk({
       reset: true,
-      message: "已重置訪客統計（已清除離場累計並取消臨時外出標記）",
+      message: "已重置訪客統計與紀錄（目前在場、臨時外出、離場已歸零）",
     });
   } catch (error) {
     await writeAudit({
