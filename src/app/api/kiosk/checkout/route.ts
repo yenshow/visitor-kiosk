@@ -1,10 +1,5 @@
 import { jsonError, jsonOk } from "@/lib/kiosk/api-helpers";
-import { markAppointmentCheckedOut } from "@/lib/kiosk/appointments";
-import {
-  clearTempOut,
-  markDeparted,
-  markTempOut,
-} from "@/lib/kiosk/presence";
+import { updateVisitStatus, VisitStateConflict } from "@/lib/kiosk/visit-actions";
 import {
   consumeCheckoutToken,
   peekCheckoutToken,
@@ -39,37 +34,12 @@ export const POST = async (request: Request) => {
       return jsonError("簽退憑證已失效，請重新查詢", 401);
     }
 
-    const {
-      appointRecordId,
-      visitorName,
-      plateNo,
-      phoneNo,
-      companyName,
-      receptionistName,
-    } = session;
-
-    if (mode === "temp") {
-      await markTempOut({
-        recordId: appointRecordId,
-        visitorName,
-        plateNo,
-        phoneNo,
-        companyName,
-        receptionistName,
-      });
-    } else if (mode === "return") {
-      await clearTempOut(appointRecordId);
-    } else {
-      await markDeparted({
-        recordId: appointRecordId,
-        visitorName,
-        plateNo,
-        phoneNo,
-        companyName,
-        receptionistName,
-      });
-      await markAppointmentCheckedOut(appointRecordId);
-    }
+    await updateVisitStatus(
+      session.appointRecordId,
+      session.status,
+      session.eventCount,
+      mode,
+    );
 
     consumeCheckoutToken(token);
     return jsonOk({
@@ -77,6 +47,7 @@ export const POST = async (request: Request) => {
       message: MESSAGES[mode],
     });
   } catch (error) {
+    if (error instanceof VisitStateConflict) return jsonError(error.message, 409);
     return jsonError(
       error instanceof Error ? error.message : "簽退失敗",
       500,

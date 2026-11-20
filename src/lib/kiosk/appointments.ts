@@ -1,45 +1,36 @@
-import { mkdir, readFile, writeFile } from "fs/promises";
-import path from "path";
 import { randomUUID } from "crypto";
 import { getAppointQueryRangeTaipei } from "@/lib/kiosk/api-helpers";
+import { readDataFile, readKioskData, updateKioskData } from "@/lib/kiosk/data-store";
+import { loadLegacyVisits } from "@/lib/kiosk/presence";
 import { getHost } from "@/lib/kiosk/directory";
 import { normalizePhoneDigits, normalizePlateNo } from "@/lib/kiosk/normalize";
 import { displayVisitorName } from "@/lib/kiosk/visitor-fields";
 import type { AppointmentItem, VisitorInfo } from "@/lib/kiosk/visitor";
 
-export type AppointmentStore = {
-  appointments: AppointmentItem[];
-};
-
-const STORE_PATH = path.join(process.cwd(), "data", "kiosk-appointments.json");
-
-const emptyStore = (): AppointmentStore => ({ appointments: [] });
-
-let writeChain: Promise<void> = Promise.resolve();
-
-const writeStore = async (store: AppointmentStore): Promise<void> => {
-  writeChain = writeChain.then(async () => {
-    await mkdir(path.dirname(STORE_PATH), { recursive: true });
-    await writeFile(STORE_PATH, JSON.stringify(store, null, 2), "utf8");
-  });
-  await writeChain;
-};
-
-const readStore = async (): Promise<AppointmentStore> => {
-  try {
-    const raw = await readFile(STORE_PATH, "utf8");
-    const parsed = JSON.parse(raw) as Partial<AppointmentStore>;
-    const list = Array.isArray(parsed.appointments) ? parsed.appointments : [];
-    return {
-      appointments: list.filter(
-        (item): item is AppointmentItem =>
-          Boolean(item && String(item.appointID ?? "").trim()),
-      ),
-    };
-  } catch {
-    return emptyStore();
+const loadLegacyAppointments = async (): Promise<AppointmentItem[]> => {
+  const data = (await readDataFile("kiosk-appointments.json")) as
+    | { appointments?: AppointmentItem[] }
+    | undefined;
+  if (!data) return [];
+  if (
+    !Array.isArray(data.appointments) ||
+    !data.appointments.every((item) => typeof item?.appointID === "string" && item.appointID.trim())
+  ) {
+    throw new Error("預約資料格式錯誤：kiosk-appointments.json");
   }
+  return data.appointments;
 };
+
+export const loadLegacyKioskData = async () => {
+  const [appointments, visits] = await Promise.all([
+    loadLegacyAppointments(),
+    loadLegacyVisits(),
+  ]);
+  return { appointments, visits };
+};
+
+export const listAppointments = async (): Promise<AppointmentItem[]> =>
+  (await readKioskData())?.appointments ?? await loadLegacyAppointments();
 
 const inQueryWindow = (
   item: AppointmentItem,
@@ -68,9 +59,9 @@ export const matchesAppointmentQuery = (
   return code === appointCode || id === appointCode;
 };
 
-const usedCodes = (store: AppointmentStore): Set<string> =>
+const usedCodes = (appointments: AppointmentItem[]): Set<string> =>
   new Set(
-    store.appointments
+    appointments
       .map((item) => String(item.appointCode ?? "").trim())
       .filter(Boolean),
   );
@@ -107,37 +98,34 @@ export const createLocalAppointment = async (input: {
   const family = String(input.visitorInfo.visitorFamilyName ?? "").trim();
   const given = String(input.visitorInfo.visitorGivenName ?? "").trim();
   const visitorName = displayVisitorName(family, given);
-  const store = await readStore();
-  const appointCode = newAppointCode(usedCodes(store));
-  const visitorId = randomUUID();
-  const appointID = randomUUID();
   const plateNo = normalizePlateNo(input.visitorInfo.plateNo);
-  const item: AppointmentItem = {
-    appointID,
-    appointCode,
-    appointStartTime: input.appointStartTime,
-    appointEndTime: input.appointEndTime,
-    appointStatus: "0",
-    receptionistId: host.personId,
-    receptionistName:
-      String(input.receptionistName ?? "").trim() || host.personName,
-    visitReasonType: input.visitReasonType,
-    visitReasonDetail: input.visitReasonDetail ?? "",
-    visitorInfo: {
-      visitorId,
-      visitorFamilyName: family,
-      visitorGivenName: given,
-      visitorName,
-      gender: input.visitorInfo.gender ?? 0,
-      companyName: String(input.visitorInfo.companyName ?? "").trim(),
-      phoneNo: normalizePhoneDigits(input.visitorInfo.phoneNo ?? ""),
-      email: String(input.visitorInfo.email ?? "").trim(),
-      ...(plateNo ? { plateNo } : {}),
-    },
-  };
-
-  await writeStore({ appointments: [...store.appointments, item] });
-  return item;
+  return updateKioskData(loadLegacyKioskData, (data) => {
+    const item: AppointmentItem = {
+      appointID: randomUUID(),
+      appointCode: newAppointCode(usedCodes(data.appointments)),
+      appointStartTime: input.appointStartTime,
+      appointEndTime: input.appointEndTime,
+      appointStatus: "0",
+      receptionistId: host.personId,
+      receptionistName:
+        String(input.receptionistName ?? "").trim() || host.personName,
+      visitReasonType: input.visitReasonType,
+      visitReasonDetail: input.visitReasonDetail ?? "",
+      visitorInfo: {
+        visitorId: randomUUID(),
+        visitorFamilyName: family,
+        visitorGivenName: given,
+        visitorName,
+        gender: input.visitorInfo.gender ?? 0,
+        companyName: String(input.visitorInfo.companyName ?? "").trim(),
+        phoneNo: normalizePhoneDigits(input.visitorInfo.phoneNo ?? ""),
+        email: String(input.visitorInfo.email ?? "").trim(),
+        ...(plateNo ? { plateNo } : {}),
+      },
+    };
+    data.appointments.push(item);
+    return item;
+  });
 };
 
 export const findAppointmentsByQuery = async (input: {
@@ -149,53 +137,10 @@ export const findAppointmentsByQuery = async (input: {
   if (!appointCode && !phoneNo) return [];
 
   const range = getAppointQueryRangeTaipei();
-  const store = await readStore();
-  return store.appointments.filter(
+  const appointments = await listAppointments();
+  return appointments.filter(
     (item) =>
       inQueryWindow(item, range) &&
       matchesAppointmentQuery(item, { appointCode, phoneNo }),
   );
-};
-
-export const getAppointmentById = async (
-  appointID: string,
-): Promise<AppointmentItem | null> => {
-  const id = String(appointID ?? "").trim();
-  if (!id) return null;
-  const store = await readStore();
-  return store.appointments.find((item) => item.appointID === id) ?? null;
-};
-
-const patchAppointment = async (
-  appointID: string,
-  status: string,
-): Promise<void> => {
-  const id = String(appointID ?? "").trim();
-  if (!id) return;
-  const store = await readStore();
-  const next = store.appointments.map((item) =>
-    item.appointID === id ? { ...item, appointStatus: status } : item,
-  );
-  await writeStore({ appointments: next });
-};
-
-export const markAppointmentCheckedIn = async (
-  appointID: string,
-): Promise<void> => {
-  const item = await getAppointmentById(appointID);
-  if (!item) throw new Error("找不到預約，請重新查詢");
-  const status = String(item.appointStatus ?? "0");
-  if (status === "3") throw new Error("此預約已報到");
-  if (status === "4") throw new Error("此預約已結束，請重新預約");
-  await patchAppointment(appointID, "3");
-};
-
-export const markAppointmentCheckedOut = async (
-  appointID: string,
-): Promise<void> => {
-  const id = String(appointID ?? "").trim();
-  if (!id) return;
-  const item = await getAppointmentById(id);
-  if (!item) return;
-  await patchAppointment(id, "4");
 };

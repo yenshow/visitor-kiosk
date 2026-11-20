@@ -1,15 +1,18 @@
-import { mkdir, readFile, writeFile } from "fs/promises";
-import path from "path";
 import {
   taipeiDateKeyFromIso,
   toTaipeiDateKey,
-  toTaipeiIso,
 } from "@/lib/kiosk/api-helpers";
+import { readDataFile, readKioskData } from "@/lib/kiosk/data-store";
 import { normalizePhoneDigits, normalizePlateNo } from "@/lib/kiosk/normalize";
 import type { FlatRegisterRecord } from "@/lib/kiosk/register-record";
 import { displayVisitorName } from "@/lib/kiosk/visitor-fields";
 
 export type VisitStatus = "on_site" | "temp_out" | "departed";
+
+export type VisitEvent = {
+  type: "checkin" | "temp_out" | "return" | "departed";
+  at: string;
+};
 
 export type VisitorVisit = {
   recordId: string;
@@ -28,13 +31,15 @@ export type VisitorVisit = {
   checkinAt: string;
   tempOutAt?: string;
   departedAt?: string;
+  events?: VisitEvent[];
 };
 
 export type VisitStore = {
   visits: VisitorVisit[];
+  statsBaseline?: { at: string; departedToday: number; departedTotal: number };
 };
 
-type VisitFieldsInput = {
+export type VisitFieldsInput = {
   recordId: string;
   visitorId?: string;
   appointId?: string;
@@ -56,21 +61,15 @@ type LegacyStoreFile = Partial<{
   visitorMeta: Array<Partial<VisitFieldsInput> & { at?: string }>;
 }>;
 
-const STORE_PATH = path.join(process.cwd(), "data", "kiosk-presence.json");
-
-const emptyStore = (): VisitStore => ({ visits: [] });
-
 const cleanName = (value?: string) =>
   displayVisitorName(undefined, undefined, value);
 
-const nowIso = () => toTaipeiIso(new Date());
-
-const mergeFields = (
+export const mergeVisitFields = (
   entry: VisitFieldsInput,
   prev?: VisitorVisit,
 ): Omit<
   VisitorVisit,
-  "status" | "checkinAt" | "tempOutAt" | "departedAt"
+  "status" | "checkinAt" | "tempOutAt" | "departedAt" | "events"
 > => {
   const reasonRaw = Number(entry.visitReasonType);
   return {
@@ -105,11 +104,11 @@ const normalizeVisit = (
     item.status === "temp_out" || item.status === "departed"
       ? item.status
       : "on_site";
-  const fields = mergeFields({ recordId, ...item });
+  const fields = mergeVisitFields({ ...item, recordId });
   return {
     ...fields,
     status,
-    checkinAt: String(item.checkinAt ?? "").trim() || nowIso(),
+    checkinAt: String(item.checkinAt ?? "").trim(),
     tempOutAt: String(item.tempOutAt ?? "").trim() || undefined,
     departedAt: String(item.departedAt ?? "").trim() || undefined,
   };
@@ -125,7 +124,7 @@ const migrateLegacyToVisits = (parsed: LegacyStoreFile): VisitorVisit[] => {
       return;
     }
     byId.set(visit.recordId, {
-      ...mergeFields(visit, prev),
+      ...mergeVisitFields(visit, prev),
       status:
         visit.status === "departed" || prev.status === "departed"
           ? "departed"
@@ -141,9 +140,9 @@ const migrateLegacyToVisits = (parsed: LegacyStoreFile): VisitorVisit[] => {
   for (const meta of parsed.visitorMeta ?? []) {
     const recordId = String(meta.recordId ?? "").trim();
     if (!recordId) continue;
-    const at = String(meta.at ?? "").trim() || nowIso();
+    const at = String(meta.at ?? "").trim();
     upsert({
-      ...mergeFields({ recordId, ...meta }),
+      ...mergeVisitFields({ ...meta, recordId }),
       status: "on_site",
       checkinAt: at,
     });
@@ -152,12 +151,12 @@ const migrateLegacyToVisits = (parsed: LegacyStoreFile): VisitorVisit[] => {
   for (const temp of parsed.tempOut ?? []) {
     const recordId = String(temp.recordId ?? "").trim();
     if (!recordId) continue;
-    const at = String(temp.at ?? "").trim() || nowIso();
+    const at = String(temp.at ?? "").trim();
     upsert({
-      ...mergeFields({ recordId, ...temp }),
+      ...mergeVisitFields({ ...temp, recordId }),
       status: "temp_out",
-      checkinAt: at,
-      tempOutAt: at,
+      checkinAt: "",
+      tempOutAt: at || undefined,
     });
   }
 
@@ -170,67 +169,41 @@ const migrateLegacyToVisits = (parsed: LegacyStoreFile): VisitorVisit[] => {
   for (const dep of rawDeparted) {
     const recordId = String(dep.recordId ?? "").trim();
     if (!recordId) continue;
-    const at = String(dep.at ?? "").trim() || nowIso();
+    const at = String(dep.at ?? "").trim();
     upsert({
-      ...mergeFields({ recordId, ...dep }),
+      ...mergeVisitFields({ ...dep, recordId }),
       status: "departed",
-      checkinAt: at,
-      departedAt: at,
+      checkinAt: "",
+      departedAt: at || undefined,
     });
   }
 
   return [...byId.values()];
 };
 
-let writeChain: Promise<void> = Promise.resolve();
-
-const writeStore = async (store: VisitStore): Promise<void> => {
-  writeChain = writeChain.then(async () => {
-    await mkdir(path.dirname(STORE_PATH), { recursive: true });
-    await writeFile(STORE_PATH, JSON.stringify(store, null, 2), "utf8");
-  });
-  await writeChain;
-};
-
-const readStore = async (): Promise<VisitStore> => {
-  try {
-    const raw = await readFile(STORE_PATH, "utf8");
-    const parsed = JSON.parse(raw) as LegacyStoreFile;
-
-    if (Array.isArray(parsed.visits)) {
-      return {
-        visits: parsed.visits
-          .map((item) => normalizeVisit(item))
-          .filter((item): item is VisitorVisit => Boolean(item)),
-      };
-    }
-
-    const migrated = migrateLegacyToVisits(parsed);
-    const store = { visits: migrated };
-    await writeStore(store);
-    return store;
-  } catch {
-    return emptyStore();
+export const loadLegacyVisits = async (): Promise<VisitorVisit[]> => {
+  const parsed = (await readDataFile("kiosk-presence.json")) as
+    | LegacyStoreFile
+    | undefined;
+  if (!parsed) return [];
+  if (Array.isArray(parsed.visits)) {
+    return parsed.visits.map((item) => {
+      const visit = item && normalizeVisit(item);
+      if (!visit) throw new Error("訪客紀錄格式錯誤：kiosk-presence.json");
+      return visit;
+    });
   }
-};
 
-const replaceVisit = (
-  visits: VisitorVisit[],
-  next: VisitorVisit,
-): VisitorVisit[] => [
-  ...visits.filter((item) => item.recordId !== next.recordId),
-  next,
-];
-
-const updateVisit = async (
-  recordId: string,
-  build: (prev: VisitorVisit | undefined) => VisitorVisit,
-): Promise<void> => {
-  const id = String(recordId ?? "").trim();
-  if (!id) throw new Error("缺少簽到記錄 ID");
-  const store = await readStore();
-  const prev = store.visits.find((item) => item.recordId === id);
-  await writeStore({ visits: replaceVisit(store.visits, build(prev)) });
+  const legacyKeys = ["visitorMeta", "tempOut", "departed", "departedToday"] as const;
+  const hasLegacyFields = legacyKeys.some((key) => key in parsed);
+  if (
+    "visits" in parsed ||
+    (!hasLegacyFields && Object.keys(parsed).length > 0) ||
+    legacyKeys.some((key) => key in parsed && !Array.isArray(parsed[key]))
+  ) {
+    throw new Error("訪客紀錄格式錯誤：kiosk-presence.json");
+  }
+  return migrateLegacyToVisits(parsed);
 };
 
 export const isDepartedToday = (
@@ -242,8 +215,8 @@ export const isDepartedToday = (
   return Boolean(day && day === today);
 };
 
-/** 讀取本機 visits。正式離場只經 markDeparted。 */
-export const getVisitStore = async (): Promise<VisitStore> => readStore();
+export const getVisitStore = async (): Promise<VisitStore> =>
+  (await readKioskData()) ?? { visits: await loadLegacyVisits() };
 
 /** 本機 visit → 在場列（統計／查詢） */
 export const visitToRegisterRecord = (
@@ -260,64 +233,3 @@ export const visitToRegisterRecord = (
   visitEndTime: String(visit.visitEndTime ?? "").trim(),
   registerTime: visit.checkinAt,
 });
-
-export const upsertVisitOnCheckin = async (
-  entry: VisitFieldsInput,
-): Promise<void> => {
-  const recordId = String(entry.recordId ?? "").trim();
-  if (!recordId) return;
-
-  const store = await readStore();
-  const prev = store.visits.find((item) => item.recordId === recordId);
-  await writeStore({
-    visits: replaceVisit(store.visits, {
-      ...mergeFields({ ...entry, recordId }, prev),
-      status: "on_site",
-      checkinAt: prev?.checkinAt || nowIso(),
-      tempOutAt: undefined,
-      departedAt: undefined,
-    }),
-  });
-};
-
-export const markTempOut = async (entry: VisitFieldsInput): Promise<void> => {
-  const at = nowIso();
-  await updateVisit(entry.recordId, (prev) => ({
-    ...mergeFields(entry, prev),
-    status: "temp_out",
-    checkinAt: prev?.checkinAt || at,
-    tempOutAt: at,
-    departedAt: undefined,
-  }));
-};
-
-export const clearTempOut = async (recordId: string): Promise<void> => {
-  const id = String(recordId ?? "").trim();
-  if (!id) return;
-  const store = await readStore();
-  const prev = store.visits.find((item) => item.recordId === id);
-  if (!prev || prev.status !== "temp_out") return;
-  await writeStore({
-    visits: replaceVisit(store.visits, {
-      ...prev,
-      status: "on_site",
-      tempOutAt: undefined,
-    }),
-  });
-};
-
-export const markDeparted = async (entry: VisitFieldsInput): Promise<void> => {
-  const at = nowIso();
-  await updateVisit(entry.recordId, (prev) => ({
-    ...mergeFields(entry, prev),
-    status: "departed",
-    checkinAt: prev?.checkinAt || at,
-    tempOutAt: undefined,
-    departedAt: at,
-  }));
-};
-
-/** 清空本機訪客紀錄：在場、臨時外出、離場一併歸零 */
-export const resetPresenceStats = async (): Promise<void> => {
-  await writeStore(emptyStore());
-};

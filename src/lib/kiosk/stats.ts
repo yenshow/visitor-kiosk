@@ -3,9 +3,10 @@ import {
   isDepartedToday,
   visitToRegisterRecord,
   type VisitorVisit,
+  type VisitStore,
 } from "@/lib/kiosk/presence";
-import { classifyActivePresence } from "@/lib/kiosk/presence-classify";
-import type { FlatRegisterRecord } from "@/lib/kiosk/register-record";
+import { classifyActivePresence, type ActivePresenceBucket } from "@/lib/kiosk/presence-classify";
+import { taipeiDateKeyFromIso, toTaipeiDateKey } from "@/lib/kiosk/api-helpers";
 
 export type KioskStats = {
   onSite: number;
@@ -13,66 +14,62 @@ export type KioskStats = {
   overstay: number;
   /** 今日離場（台北日） */
   departed: number;
-  /** 所有離場累計 */
+  /** 本期離場累計 */
   departedTotal: number;
 };
 
 export type PresenceSnapshot = {
-  onSitePeople: FlatRegisterRecord[];
-  tempOutPeople: FlatRegisterRecord[];
-  overstayPeople: FlatRegisterRecord[];
-  visitsById: Map<string, VisitorVisit>;
+  onSitePeople: VisitorVisit[];
+  tempOutPeople: VisitorVisit[];
+  overstayPeople: VisitorVisit[];
   departedAll: VisitorVisit[];
   departedToday: VisitorVisit[];
+  today: string;
+  statsBaseline: VisitStore["statsBaseline"];
 };
 
-const pushByBucket = (
-  bucket: ReturnType<typeof classifyActivePresence>,
-  flat: FlatRegisterRecord,
-  onSite: FlatRegisterRecord[],
-  tempOut: FlatRegisterRecord[],
-  overstay: FlatRegisterRecord[],
-) => {
-  if (bucket === "overstay") overstay.push(flat);
-  else if (bucket === "temp_out") tempOut.push(flat);
-  else if (bucket === "on_site") onSite.push(flat);
-};
-
-export const loadPresenceSnapshot = async (): Promise<PresenceSnapshot> => {
-  const store = await getVisitStore();
-  const visitsById = new Map(store.visits.map((item) => [item.recordId, item]));
-
-  const onSitePeople: FlatRegisterRecord[] = [];
-  const tempOutPeople: FlatRegisterRecord[] = [];
-  const overstayPeople: FlatRegisterRecord[] = [];
+export const presenceSnapshot = (store: VisitStore): PresenceSnapshot => {
+  const today = toTaipeiDateKey();
+  const active: Record<ActivePresenceBucket, VisitorVisit[]> = {
+    on_site: [], temp_out: [], overstay: [],
+  };
+  const departedAll: VisitorVisit[] = [];
+  const departedToday: VisitorVisit[] = [];
 
   for (const visit of store.visits) {
-    if (visit.status === "departed") continue;
-    const flat = visitToRegisterRecord(visit);
-    const bucket = classifyActivePresence({ visit, flat });
-    if (!bucket) continue;
-    pushByBucket(bucket, flat, onSitePeople, tempOutPeople, overstayPeople);
+    if (visit.status === "departed") {
+      departedAll.push(visit);
+      if (isDepartedToday(visit, today)) departedToday.push(visit);
+    } else {
+      const bucket = classifyActivePresence({ visit, flat: visitToRegisterRecord(visit) });
+      if (bucket) active[bucket].push(visit);
+    }
   }
 
-  const departedAll = store.visits.filter((item) => item.status === "departed");
-
   return {
-    onSitePeople,
-    tempOutPeople,
-    overstayPeople,
-    visitsById,
+    onSitePeople: active.on_site,
+    tempOutPeople: active.temp_out,
+    overstayPeople: active.overstay,
     departedAll,
-    departedToday: departedAll.filter((item) => isDepartedToday(item)),
+    departedToday,
+    today,
+    statsBaseline: store.statsBaseline,
   };
 };
 
-export const statsFromSnapshot = (snap: PresenceSnapshot): KioskStats => ({
-  onSite: snap.onSitePeople.length,
-  tempOut: snap.tempOutPeople.length,
-  overstay: snap.overstayPeople.length,
-  departed: snap.departedToday.length,
-  departedTotal: snap.departedAll.length,
-});
+export const statsFromSnapshot = (snap: PresenceSnapshot): KioskStats => {
+  const baseline = snap.statsBaseline;
+  const todayBaseline = baseline && taipeiDateKeyFromIso(baseline.at) === snap.today
+    ? baseline.departedToday
+    : 0;
+  return {
+    onSite: snap.onSitePeople.length,
+    tempOut: snap.tempOutPeople.length,
+    overstay: snap.overstayPeople.length,
+    departed: Math.max(0, snap.departedToday.length - todayBaseline),
+    departedTotal: Math.max(0, snap.departedAll.length - (baseline?.departedTotal ?? 0)),
+  };
+};
 
 export const computeKioskStats = async (): Promise<KioskStats> =>
-  statsFromSnapshot(await loadPresenceSnapshot());
+  statsFromSnapshot(presenceSnapshot(await getVisitStore()));

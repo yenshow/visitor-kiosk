@@ -1,7 +1,7 @@
 import { jsonError, jsonOk } from "@/lib/kiosk/api-helpers";
 import { guardAdminAction } from "@/lib/kiosk/admin-guard";
 import { writeAudit } from "@/lib/kiosk/audit";
-import { listVisitorRecords } from "@/lib/kiosk/records";
+import { listKioskRecords } from "@/lib/kiosk/records";
 
 /** GET：訪客紀錄明細（管理員） */
 export const GET = async (request: Request) => {
@@ -9,9 +9,11 @@ export const GET = async (request: Request) => {
   if (denied) return denied;
 
   try {
-    const data = await listVisitorRecords();
+    const records = await listKioskRecords();
     await writeAudit({ action: "records.get", result: "ok", ip });
-    return jsonOk(data);
+    const response = jsonOk(records);
+    response.headers.set("Cache-Control", "private, no-store");
+    return response;
   } catch (error) {
     await writeAudit({
       action: "records.get",
@@ -20,7 +22,7 @@ export const GET = async (request: Request) => {
       detail: error instanceof Error ? error.message : "fail",
     });
     return jsonError(
-      error instanceof Error ? error.message : "取得訪客紀錄失敗",
+      "取得訪客紀錄失敗，請聯絡維運人員檢查資料檔",
       500,
     );
   }

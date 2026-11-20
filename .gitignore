@@ -24,6 +24,9 @@ npm-debug.log*
 # YSOP 現場狀態／設定（運行時寫入）
 /data/kiosk-presence.json
 /data/kiosk-appointments.json
+/data/kiosk-data.json
+/data/.kiosk-data-initialized
+/data/.kiosk-data-*.tmp
 /data/kiosk-directory.json
 /data/kiosk-settings.json
 /data/kiosk-license.json

@@ -1,4 +1,5 @@
 import { randomBytes } from "crypto";
+import type { VisitStatus } from "@/lib/kiosk/presence";
 import type { AppointmentItem } from "@/lib/kiosk/visitor";
 
 type SessionEntry = {
@@ -8,11 +9,8 @@ type SessionEntry = {
 
 export type CheckoutSessionPayload = {
   appointRecordId: string;
-  visitorName: string;
-  plateNo: string;
-  phoneNo?: string;
-  companyName?: string;
-  receptionistName?: string;
+  status: VisitStatus;
+  eventCount: number;
 };
 
 type CheckoutSessionEntry = CheckoutSessionPayload & {
@@ -86,11 +84,8 @@ const toCheckoutPayload = (
   entry: CheckoutSessionEntry,
 ): CheckoutSessionPayload => ({
   appointRecordId: entry.appointRecordId,
-  visitorName: entry.visitorName,
-  plateNo: entry.plateNo,
-  phoneNo: entry.phoneNo,
-  companyName: entry.companyName,
-  receptionistName: entry.receptionistName,
+  status: entry.status,
+  eventCount: entry.eventCount,
 });
 
 export const consumeCheckoutToken = (

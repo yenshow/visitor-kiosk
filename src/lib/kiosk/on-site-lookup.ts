@@ -74,11 +74,8 @@ const toView = (
   return {
     token: createCheckoutToken({
       appointRecordId: visit.recordId,
-      visitorName,
-      plateNo,
-      phoneNo,
-      companyName: visit.companyName,
-      receptionistName: visit.receptionistName || "",
+      status: visit.status,
+      eventCount: visit.events?.length ?? 0,
     }),
     visitorName,
     phoneNo,

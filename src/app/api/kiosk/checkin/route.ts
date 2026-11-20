@@ -1,7 +1,6 @@
 import { jsonError, jsonOk, toTaipeiIso } from "@/lib/kiosk/api-helpers";
-import { markAppointmentCheckedIn } from "@/lib/kiosk/appointments";
 import { normalizePhoneDigits, normalizePlateNo } from "@/lib/kiosk/normalize";
-import { upsertVisitOnCheckin } from "@/lib/kiosk/presence";
+import { checkInVisit, VisitStateConflict } from "@/lib/kiosk/visit-actions";
 import {
   consumeCheckinToken,
   peekCheckinToken,
@@ -43,10 +42,7 @@ export const POST = async (request: Request) => {
     const phoneNo = normalizePhoneDigits(info?.phoneNo ?? "");
     const plateNo = normalizePlateNo(info?.plateNo);
 
-    await markAppointmentCheckedIn(appointId);
-    consumeCheckinToken(token);
-
-    await upsertVisitOnCheckin({
+    await checkInVisit({
       recordId: appointId,
       visitorId,
       appointId,
@@ -65,8 +61,10 @@ export const POST = async (request: Request) => {
       visitEndTime,
     });
 
+    consumeCheckinToken(token);
     return jsonOk({});
   } catch (error) {
+    if (error instanceof VisitStateConflict) return jsonError(error.message, 409);
     return jsonError(
       error instanceof Error ? error.message : "簽到失敗",
       500,

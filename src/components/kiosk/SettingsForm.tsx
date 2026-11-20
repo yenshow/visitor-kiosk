@@ -29,7 +29,7 @@ type SettingsFormProps = {
 };
 
 const RESET_DESC =
-  "清空本機訪客紀錄：目前在場、臨時外出、離場人數都會歸零。部門與被訪人、未報到的預約不受影響。";
+  "今日與本期離場統計將歸零，後續離場重新計數。在場、外出狀態和歷史紀錄會保留。";
 
 const LABEL = "text-base font-medium text-slate-700";
 const FIELD =
@@ -95,7 +95,6 @@ export const SettingsForm = ({ initial, onSaved }: SettingsFormProps) => {
   const [directoryOpen, setDirectoryOpen] = useState(false);
   const [error, setError] = useState("");
   const [savedHint, setSavedHint] = useState("");
-  const [recordsReload, setRecordsReload] = useState(0);
 
   useEffect(() => {
     if (!resetConfirm) return;
@@ -206,7 +205,6 @@ export const SettingsForm = ({ initial, onSaved }: SettingsFormProps) => {
       }
       setResetConfirm(false);
       setSavedHint(json.data?.message || "已重置訪客統計");
-      setRecordsReload((n) => n + 1);
     } catch {
       setError("重置失敗");
     } finally {
@@ -472,11 +470,7 @@ export const SettingsForm = ({ initial, onSaved }: SettingsFormProps) => {
         onClose={() => setDirectoryOpen(false)}
       />
 
-      <RecordsDialog
-        open={recordsOpen}
-        onClose={() => setRecordsOpen(false)}
-        reloadToken={recordsReload}
-      />
+      <RecordsDialog open={recordsOpen} onClose={() => setRecordsOpen(false)} />
 
       {resetConfirm ? (
         <div
