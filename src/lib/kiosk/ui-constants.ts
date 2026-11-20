@@ -5,6 +5,9 @@ export const DEFAULT_MARQUEE =
 /** 無操作倒數回首頁秒數 */
 export const KIOSK_IDLE_SECONDS = 20;
 
+/** 外部預約可選日期：今日起最長天數（含當日） */
+export const PUBLIC_BOOKING_MAX_DAYS = 30;
+
 export type RecordsFilter =
   | "all"
   | "on_site"

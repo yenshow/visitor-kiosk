@@ -8,24 +8,12 @@
  *
  * Commands:
  *   status | save-service
- *   license-activate | license-offline-request | license-offline-import
  */
 import { existsSync } from "fs";
 import path from "path";
 import { getConfig, getKioskListenPort } from "../src/lib/config";
 import {
-  activateLicenseByKey,
-  buildOfflineRequestBase64,
-  importOfflineLicensePayload,
-} from "../src/lib/license/activate-service";
-import { LicensePlatformError } from "../src/lib/license/platform";
-import {
-  getLicenseState,
-  toLicenseSummary,
-} from "../src/lib/license/store";
-import {
   loadDotEnv,
-  readUtf8,
   removeEnvLine,
   upsertEnvLine,
   writeUtf8,
@@ -109,15 +97,11 @@ const main = async () => {
 
   if (command === "status") {
     const cfg = getConfig();
-    const license = toLicenseSummary(await getLicenseState());
     emit({
       ok: true,
-      licensed: license.licensed,
-      licenseKey: license.licenseKey,
-      serialNumber: license.serialNumber,
-      activationMethod: license.activationMethod,
       listenPort: cfg.kiosk.listenPort,
       adminIps: cfg.kiosk.adminIps,
+      allowPublicBooking: envFlagTrue("KIOSK_ALLOW_PUBLIC_BOOKING"),
     });
     return;
   }
@@ -128,81 +112,59 @@ const main = async () => {
     const listenPort = portFlag
       ? parseListenPort(portFlag)
       : getKioskListenPort();
+    const allowPublic =
+      flags["allow-public"] === true ||
+      flags["allow-public"] === "1" ||
+      flags["allow-public"] === "true" ||
+      flags.allowPublic === true ||
+      flags.allowPublic === "1" ||
+      flags.allowPublic === "true";
 
     if (!existsSync(envPath)) writeUtf8(envPath, "");
     upsertEnvLine(envPath, "KIOSK_ADMIN_IPS", adminIps);
     upsertEnvLine(envPath, "PORT", String(listenPort));
     upsertEnvLine(envPath, "HOSTNAME", process.env.HOSTNAME || "0.0.0.0");
-    removeEnvLine(envPath, "YSCP_HOST");
-    removeEnvLine(envPath, "YSCP_AK");
-    removeEnvLine(envPath, "YSCP_SK");
-    removeEnvLine(envPath, "YSCP_EVENT_DEST");
-    removeEnvLine(envPath, "YSCP_EVENT_TOKEN");
-    removeEnvLine(envPath, "YSCP_EXIT_LANES");
-    removeEnvLine(envPath, "YSCP_SOURCE_IP");
-    removeEnvLine(envPath, "YSCP_TLS_INSECURE");
-    removeEnvLine(envPath, "YSCP_EXIT_GATE_MINUTES");
+    upsertEnvLine(
+      envPath,
+      "KIOSK_ALLOW_PUBLIC_BOOKING",
+      allowPublic ? "1" : "0",
+    );
+    // 清掉舊版殘留鍵（YSCP／授權）
+    for (const key of [
+      "YSCP_HOST",
+      "YSCP_AK",
+      "YSCP_SK",
+      "YSCP_EVENT_DEST",
+      "YSCP_EVENT_TOKEN",
+      "YSCP_EXIT_LANES",
+      "YSCP_SOURCE_IP",
+      "YSCP_TLS_INSECURE",
+      "YSCP_EXIT_GATE_MINUTES",
+      "LICENSE_PLATFORM_API_BASE_URL",
+      "LICENSE_SIGN_SECRET",
+      "LICENSE_OPEN_ALL_FEATURES",
+      "LICENSE_PLATFORM_TIMEOUT_MS",
+    ]) {
+      removeEnvLine(envPath, key);
+    }
     emit({
       ok: true,
       envPath,
       listenPort,
       adminIps,
+      allowPublicBooking: allowPublic,
     });
     return;
   }
 
-  if (command === "license-activate") {
-    const key = String(flags.key ?? flags.licenseKey ?? "").trim();
-    if (!key) fail("請提供 --key <License Key>");
-    try {
-      const state = await activateLicenseByKey(key);
-      emit({ ok: true, ...toLicenseSummary(state) });
-    } catch (error) {
-      if (error instanceof LicensePlatformError) {
-        fail(error.message);
-      }
-      fail(error instanceof Error ? error.message : "授權啟用失敗");
-    }
-    return;
-  }
-
-  if (command === "license-offline-request") {
-    const key = String(flags.key ?? flags.licenseKey ?? "").trim();
-    if (!key) fail("請提供 --key <License Key>");
-    try {
-      const requestFileBase64 = buildOfflineRequestBase64(key);
-      emit({ ok: true, requestFileBase64 });
-    } catch (error) {
-      fail(error instanceof Error ? error.message : "產生請求檔失敗");
-    }
-    return;
-  }
-
-  if (command === "license-offline-import") {
-    const filePath = String(flags.file ?? "").trim();
-    const rawJson = String(flags.json ?? "").trim();
-    let payload: unknown;
-    try {
-      if (filePath) {
-        payload = JSON.parse(readUtf8(filePath));
-      } else if (rawJson) {
-        payload = JSON.parse(rawJson);
-      } else {
-        fail("請提供 --file <回應檔> 或 --json <payload>");
-      }
-    } catch {
-      fail("離線授權檔不是有效 JSON");
-    }
-    try {
-      const state = await importOfflineLicensePayload(payload);
-      emit({ ok: true, ...toLicenseSummary(state) });
-    } catch (error) {
-      fail(error instanceof Error ? error.message : "匯入失敗");
-    }
-    return;
-  }
-
   fail(`未知命令: ${command}`);
+};
+
+const envFlagTrue = (key: string): boolean => {
+  const v = String(process.env[key] ?? "")
+    .trim()
+    .toLowerCase();
+  return v === "1" || v === "true" || v === "yes";
 };
 
 main().catch((error) => {

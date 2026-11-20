@@ -19,10 +19,6 @@ import {
 
 type Screen = "home" | "appoint" | "checkin" | "checkout";
 
-type StatusInfo = {
-  licensed?: boolean;
-};
-
 const STATS_POLL_MS = 20_000;
 
 const FlowPanel = ({
@@ -43,7 +39,6 @@ const FlowPanel = ({
 
 export default function HomePage() {
   const [screen, setScreen] = useState<Screen>("home");
-  const [status, setStatus] = useState<StatusInfo | null>(null);
   const [stats, setStats] = useState<KioskStatsView | null>(null);
   const [settings, setSettings] = useState<KioskSettingsView | null>(null);
 
@@ -51,16 +46,11 @@ export default function HomePage() {
     let cancelled = false;
     const load = async () => {
       try {
-        const [statusRes, settingsRes] = await Promise.all([
-          fetch("/api/kiosk/status"),
-          fetch("/api/kiosk/settings"),
-        ]);
-        const statusJson = (await statusRes.json()) as { data?: StatusInfo };
+        const settingsRes = await fetch("/api/kiosk/settings");
         const settingsJson = (await settingsRes.json()) as {
           data?: KioskSettingsView;
         };
         if (cancelled) return;
-        if (statusJson.data) setStatus(statusJson.data);
         if (settingsJson.data) setSettings(settingsJson.data);
       } catch {
         // ignore
@@ -98,13 +88,11 @@ export default function HomePage() {
   }, [screen]);
 
   const showAppoint = settings?.showAppoint ?? true;
-  const licensed = status == null ? true : status.licensed !== false;
 
   return (
     <>
       <ThemeSync theme={settings?.theme} />
       <KioskShell
-        licensed={licensed}
         layout={screen === "home" ? "home" : "flow"}
         marquee={settings?.resolvedMarquee || DEFAULT_MARQUEE}
         logoUrl={settings?.logoUrl || "/yenshow-logo.svg"}
@@ -113,7 +101,6 @@ export default function HomePage() {
           <HomeActionCards
             stats={stats}
             showAppoint={showAppoint}
-            licensed={licensed}
             onCheckin={() => setScreen("checkin")}
             onCheckout={() => setScreen("checkout")}
             onAppoint={() => setScreen("appoint")}
@@ -123,6 +110,7 @@ export default function HomePage() {
         {screen === "appoint" ? (
           <FlowPanel wide>
             <AppointForm
+              variant="kiosk"
               idleSeconds={KIOSK_IDLE_SECONDS}
               onHome={() => setScreen("home")}
             />

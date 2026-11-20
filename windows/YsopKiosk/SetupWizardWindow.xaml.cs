@@ -38,6 +38,7 @@ public partial class SetupWizardWindow : Window
             TxtListenPort.Text = port.ToString();
         }
         TxtAdminIps.Text = st.GetString("adminIps") ?? "";
+        ChkAllowPublic.IsChecked = st.GetBool("allowPublicBooking");
     }
 
     private async Task<bool> SaveServiceAsync()
@@ -48,13 +49,16 @@ public partial class SetupWizardWindow : Window
             return false;
         }
         _listenPort = port;
+        var allowPublic = ChkAllowPublic.IsChecked == true;
         var save = await YscpBridgeClient.RunAsync(
             _root,
             "save-service",
             "--port",
             port.ToString(),
             "--admin-ips",
-            TxtAdminIps.Text);
+            TxtAdminIps.Text,
+            "--allow-public",
+            allowPublic ? "1" : "0");
         if (save.Ok) return true;
         MessageBox.Show(save.Error ?? "儲存失敗", "服務設定",
             MessageBoxButton.OK, MessageBoxImage.Error);
@@ -68,9 +72,11 @@ public partial class SetupWizardWindow : Window
         {
             if (!await SaveServiceAsync()) return;
 
+            var allowPublic = ChkAllowPublic.IsChecked == true;
             var (fwOk, fwMsg) = FirewallHelper.ApplyInboundAllow(
                 _listenPort,
-                TxtAdminIps.Text);
+                TxtAdminIps.Text,
+                allowPublic);
 
             Applied = true;
             var msg = "服務設定已套用。將重啟訪客機服務。";

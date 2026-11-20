@@ -15,6 +15,21 @@
   animation: marquee-scroll 30s linear infinite;
 }
 
+@keyframes book-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.book-enter {
+  animation: book-enter 0.45s ease-out both;
+}
+
 /*
  * 主題語意變數（對齊 ba-frontend-construction）
  * 明亮／黑暗皆：報到＝亮色主按鈕；簽退＝玻璃次按鈕；統計卡＝輕量面板（不另加重底）

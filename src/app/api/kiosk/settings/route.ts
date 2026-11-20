@@ -1,18 +1,37 @@
 import { jsonError, jsonOk } from "@/lib/kiosk/api-helpers";
+import {
+  getClientIp,
+  isLocalHostHeader,
+  isLoopbackIp,
+  parseAdminIps,
+} from "@/lib/kiosk/access";
 import { guardAdminAction } from "@/lib/kiosk/admin-guard";
 import { writeAudit } from "@/lib/kiosk/audit";
 import {
   getSettings,
   normalizeApproverEmails,
+  toAdminSettingsView,
   toSettingsView,
   updateSettings,
 } from "@/lib/kiosk/settings";
 import { normalizeTheme, themeCookieHeader } from "@/lib/kiosk/theme";
 
-export const GET = async () => {
+const isAdminRequest = (request: Request): boolean => {
+  const ip = getClientIp(request.headers);
+  const adminIps = parseAdminIps(process.env.KIOSK_ADMIN_IPS);
+  return (
+    isLoopbackIp(ip) ||
+    (!ip && isLocalHostHeader(request.headers.get("host"))) ||
+    (ip !== "" && adminIps.includes(ip))
+  );
+};
+
+export const GET = async (request: Request) => {
   try {
     const settings = await getSettings();
-    const view = toSettingsView(settings);
+    const view = isAdminRequest(request)
+      ? toAdminSettingsView(settings)
+      : toSettingsView(settings);
     const response = jsonOk(view);
     response.headers.append("Set-Cookie", themeCookieHeader(view.theme));
     return response;
@@ -30,6 +49,7 @@ type PutBody = {
   theme?: string;
   noticeVideoUrl?: string;
   approverEmails?: string[] | string;
+  publicBookingEnabled?: boolean;
 };
 
 export const PUT = async (request: Request) => {
@@ -44,6 +64,7 @@ export const PUT = async (request: Request) => {
       theme?: "light" | "dark";
       noticeVideoUrl?: string;
       approverEmails?: string[];
+      publicBookingEnabled?: boolean;
     } = {};
 
     if (typeof body.marquee === "string") {
@@ -61,9 +82,12 @@ export const PUT = async (request: Request) => {
     if (body.approverEmails !== undefined) {
       patch.approverEmails = normalizeApproverEmails(body.approverEmails);
     }
+    if (typeof body.publicBookingEnabled === "boolean") {
+      patch.publicBookingEnabled = body.publicBookingEnabled;
+    }
 
     const settings = await updateSettings(patch);
-    const view = toSettingsView(settings);
+    const view = toAdminSettingsView(settings);
     await writeAudit({ action: "settings.put", result: "ok", ip });
     const response = jsonOk(view);
     response.headers.append("Set-Cookie", themeCookieHeader(view.theme));

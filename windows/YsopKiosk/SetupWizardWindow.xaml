@@ -15,7 +15,7 @@
                Foreground="{StaticResource TextPrimaryBrush}"/>
     <TextBlock FontSize="13" Margin="0,3,0,14"
                Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"
-               Text="設定服務埠與管理員 IP。產品授權請至主畫面「授權設定」。"/>
+               Text="設定服務埠、管理員 IP，以及是否開放外部預約入站。"/>
 
     <Border Padding="14,12"
             Background="{StaticResource CardBackgroundBrush}"
@@ -24,13 +24,14 @@
       <StackPanel>
         <TextBlock Style="{StaticResource SectionHeader}" Text="服務埠與來源限制"/>
         <TextBlock Style="{StaticResource FormHint}" Margin="0,0,0,8"
-                   Text="防火牆僅放行本機與管理員 IP。訪客畫面走本機，不需入站。埠可用 80。"/>
+                   Text="未勾選外部預約時，防火牆僅放行本機與管理員 IP。勾選後開放入站，設定頁仍僅管理員 IP 可開。"/>
         <Grid>
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="110"/>
             <ColumnDefinition Width="*"/>
           </Grid.ColumnDefinitions>
           <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
           </Grid.RowDefinitions>
@@ -42,10 +43,15 @@
           <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource FormLabel}"
                      VerticalAlignment="Top" Margin="0,8,0,0" Text="管理員 IP"/>
           <TextBox Grid.Row="1" Grid.Column="1" x:Name="TxtAdminIps"
-                   Style="{StaticResource ThemedTextBox}" MinHeight="64"
+                   Style="{StaticResource ThemedTextBox}" MinHeight="64" Margin="0,0,0,8"
                    AcceptsReturn="True" TextWrapping="Wrap"
                    VerticalScrollBarVisibility="Auto"
                    ToolTip="瀏覽器連線端的 IP（非本機訪客機 IP）；可多行或逗號；空白則僅本機可開設定頁"/>
+          <CheckBox Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2"
+                    x:Name="ChkAllowPublic"
+                    Margin="0,4,0,0"
+                    Content="允許外部預約入站（開放防火牆；建議另以反向代理＋HTTPS）"
+                    FontSize="13"/>
         </Grid>
       </StackPanel>
     </Border>

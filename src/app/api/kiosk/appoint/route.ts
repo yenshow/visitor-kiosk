@@ -1,13 +1,22 @@
 import { createLocalAppointment } from "@/lib/kiosk/appointments";
 import {
+  addDaysToTaipeiDateKey,
   jsonError,
   jsonOk,
   taipeiDateKeyFromIso,
   toTaipeiDateKey,
 } from "@/lib/kiosk/api-helpers";
-import { notifyApproversOfAppointment } from "@/lib/kiosk/approver-mail";
-import { requireVisitorLicense } from "@/lib/license/gate";
+import { getClientIp } from "@/lib/kiosk/access";
+import { notifyAppointmentMails } from "@/lib/kiosk/appoint-mail";
 import { normalizePhoneDigits, normalizePlateNo } from "@/lib/kiosk/normalize";
+import {
+  APPOINT_RATE_MAX,
+  APPOINT_RATE_WINDOW_MS,
+  rateLimitResponse,
+  takeRateToken,
+} from "@/lib/kiosk/rate-limit";
+import { getSettings } from "@/lib/kiosk/settings";
+import { PUBLIC_BOOKING_MAX_DAYS } from "@/lib/kiosk/ui-constants";
 import { isValidEmail } from "@/lib/kiosk/visitor-fields";
 
 type AppointBody = {
@@ -24,14 +33,30 @@ type AppointBody = {
   email?: string;
   gender?: number;
   plateNo?: string;
+  /** kiosk＝現場當日；public＝外部可跨日 */
+  source?: "kiosk" | "public";
 };
 
 export const POST = async (request: Request) => {
-  const denied = await requireVisitorLicense();
-  if (denied) return denied;
+  const ip = getClientIp(request.headers);
+  const limited = takeRateToken(
+    `appoint:${ip || "unknown"}`,
+    APPOINT_RATE_MAX,
+    APPOINT_RATE_WINDOW_MS,
+  );
+  if (!limited.ok) return rateLimitResponse(limited.retryAfterSec);
 
   try {
     const body = (await request.json()) as AppointBody;
+    const source: "kiosk" | "public" =
+      body.source === "public" ? "public" : "kiosk";
+
+    if (source === "public") {
+      const settings = await getSettings();
+      if (!settings.publicBookingEnabled) {
+        return jsonError("外部預約目前未開放", 403);
+      }
+    }
 
     const receptionistId = String(body.receptionistId ?? "").trim();
     const receptionistName = String(body.receptionistName ?? "").trim();
@@ -69,8 +94,21 @@ export const POST = async (request: Request) => {
     if (!startDay || !endDay) {
       return jsonError("開始或結束時間格式不正確");
     }
-    if (startDay !== today || endDay !== today) {
-      return jsonError("現場預約僅限當日，不可跨日");
+    if (startDay !== endDay) {
+      return jsonError("開始與結束須為同一日");
+    }
+
+    if (source === "kiosk") {
+      if (startDay !== today) {
+        return jsonError("現場預約僅限當日，不可跨日");
+      }
+    } else {
+      const maxDay = addDaysToTaipeiDateKey(today, PUBLIC_BOOKING_MAX_DAYS - 1);
+      if (!maxDay || startDay < today || startDay > maxDay) {
+        return jsonError(
+          `外部預約僅限今日起 ${PUBLIC_BOOKING_MAX_DAYS} 日內`,
+        );
+      }
     }
 
     const item = await createLocalAppointment({
@@ -96,7 +134,7 @@ export const POST = async (request: Request) => {
       ? `預約已完成。請至「訪客報到」輸入手機或預約碼 ${appointCode}。`
       : "預約已完成。請至「訪客報到」輸入手機號碼。";
 
-    void notifyApproversOfAppointment({
+    const visitorEmail = notifyAppointmentMails({
       visitorFamilyName,
       visitorGivenName,
       companyName,
@@ -109,11 +147,13 @@ export const POST = async (request: Request) => {
       receptionistName: item.receptionistName ?? receptionistName,
       orgLabel,
       appointCode,
+      source,
     });
 
     return jsonOk({
       waitingMessage,
       appointCode,
+      ...(source === "public" && { visitorEmailSent: await visitorEmail }),
     });
   } catch (error) {
     return jsonError(

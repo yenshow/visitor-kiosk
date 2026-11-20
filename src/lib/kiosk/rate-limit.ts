@@ -106,3 +106,6 @@ export const QUERY_RATE_MAX = 20;
 export const QUERY_RATE_WINDOW_MS = 60_000;
 export const ADMIN_RATE_MAX = 30;
 export const ADMIN_RATE_WINDOW_MS = 60_000;
+/** 預約 API（含外部公開）：每 IP 每分鐘 */
+export const APPOINT_RATE_MAX = 10;
+export const APPOINT_RATE_WINDOW_MS = 60_000;

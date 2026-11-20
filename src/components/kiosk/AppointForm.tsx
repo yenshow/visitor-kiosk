@@ -4,35 +4,53 @@ import { useState } from "react";
 import { FlowCard } from "@/components/kiosk/FlowCard";
 import { IdleCountdown } from "@/components/kiosk/IdleCountdown";
 import { HostPicker, type HostPerson } from "@/components/kiosk/HostPicker";
+import {
+  addDaysToTaipeiDateKey,
+  toTaipeiDateKey,
+} from "@/lib/kiosk/api-helpers";
 import { normalizePlateNo } from "@/lib/kiosk/normalize";
+import {
+  KIOSK_IDLE_SECONDS,
+  PUBLIC_BOOKING_MAX_DAYS,
+} from "@/lib/kiosk/ui-constants";
 import { isValidEmail } from "@/lib/kiosk/visitor-fields";
 import { VISIT_REASON_OPTIONS } from "@/lib/kiosk/visit-reason";
 
+export type AppointFormVariant = "kiosk" | "public";
+
 type AppointFormProps = {
-  idleSeconds: number;
-  onHome: () => void;
+  variant?: AppointFormVariant;
+  idleSeconds?: number;
+  onHome?: () => void;
 };
 
-const pad = (n: number) => String(n).padStart(2, "0");
-
-const todayDateKey = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+type AppointmentResult = {
+  appointCode: string;
+  visitorEmailSent?: boolean;
 };
-
-const defaultTimes = () => ({ start: "09:00", end: "18:00" });
 
 const FIELD_CLASS =
   "min-h-14 w-full min-w-0 max-w-full rounded-xl border border-slate-300 bg-white px-4 text-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30";
 
-/** 當日 HH:mm → ISO 8601 +08:00（僅限當日、不可跨日） */
-const toTaipeiIsoFromTodayTime = (time: string): string => {
+/** 指定日 HH:mm → ISO 8601 +08:00 */
+const toTaipeiIsoFromDateAndTime = (dateKey: string, time: string): string => {
   const trimmed = String(time ?? "").trim();
   if (!/^\d{2}:\d{2}$/.test(trimmed)) return "";
-  return `${todayDateKey()}T${trimmed}:00+08:00`;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return "";
+  return `${dateKey}T${trimmed}:00+08:00`;
 };
 
-export const AppointForm = ({ idleSeconds, onHome }: AppointFormProps) => {
+export const AppointForm = ({
+  variant = "kiosk",
+  idleSeconds = KIOSK_IDLE_SECONDS,
+  onHome,
+}: AppointFormProps) => {
+  const isPublic = variant === "public";
+  const today = toTaipeiDateKey();
+  const maxDate = isPublic
+    ? addDaysToTaipeiDateKey(today, PUBLIC_BOOKING_MAX_DAYS - 1)
+    : undefined;
+
   const [familyName, setFamilyName] = useState("");
   const [givenName, setGivenName] = useState("");
   const [email, setEmail] = useState("");
@@ -40,26 +58,29 @@ export const AppointForm = ({ idleSeconds, onHome }: AppointFormProps) => {
   const [phone, setPhone] = useState("");
   const [plateNo, setPlateNo] = useState("");
   const [reasonType, setReasonType] = useState(0);
-  const [startAt, setStartAt] = useState(() => defaultTimes().start);
-  const [endAt, setEndAt] = useState(() => defaultTimes().end);
+  const [visitDate, setVisitDate] = useState(today);
+  const [startAt, setStartAt] = useState("09:00");
+  const [endAt, setEndAt] = useState("18:00");
   const [selectedHost, setSelectedHost] = useState<HostPerson | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const [waitingMessage, setWaitingMessage] = useState("");
+  const [result, setResult] = useState<AppointmentResult | null>(null);
 
   const phoneDigits = phone.replace(/\D/g, "");
   const emailTrimmed = email.trim();
   const familyNameTrimmed = familyName.trim();
   const givenNameTrimmed = givenName.trim();
+  const dateKey = isPublic ? visitDate : today;
   const canSubmit = Boolean(
     (familyNameTrimmed || givenNameTrimmed) &&
-    isValidEmail(emailTrimmed) &&
-    phoneDigits.length >= 8 &&
-    phoneDigits.length <= 15 &&
-    selectedHost &&
-    startAt &&
-    endAt &&
-    startAt < endAt,
+      isValidEmail(emailTrimmed) &&
+      phoneDigits.length >= 8 &&
+      phoneDigits.length <= 15 &&
+      selectedHost &&
+      dateKey &&
+      startAt &&
+      endAt &&
+      startAt < endAt,
   );
 
   const handleSubmit = async () => {
@@ -72,10 +93,12 @@ export const AppointForm = ({ idleSeconds, onHome }: AppointFormProps) => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          source: variant,
           receptionistId: selectedHost.personId,
           receptionistName: selectedHost.personName,
-          appointStartTime: toTaipeiIsoFromTodayTime(startAt),
-          appointEndTime: toTaipeiIsoFromTodayTime(endAt),
+          orgLabel: selectedHost.orgName?.trim() || "",
+          appointStartTime: toTaipeiIsoFromDateAndTime(dateKey, startAt),
+          appointEndTime: toTaipeiIsoFromDateAndTime(dateKey, endAt),
           visitReasonType: reasonType,
           visitorFamilyName: familyNameTrimmed,
           visitorGivenName: givenNameTrimmed,
@@ -88,16 +111,16 @@ export const AppointForm = ({ idleSeconds, onHome }: AppointFormProps) => {
       });
       const json = (await res.json()) as {
         msg?: string;
-        data?: { waitingMessage?: string };
+        data?: Partial<AppointmentResult>;
       };
       if (!res.ok) {
         setError(json.msg || "送出預約失敗");
         return;
       }
-      setWaitingMessage(
-        json.data?.waitingMessage ||
-          "預約已完成。請至「訪客報到」輸入手機或預約碼。",
-      );
+      setResult({
+        appointCode: String(json.data?.appointCode ?? "").trim(),
+        visitorEmailSent: json.data?.visitorEmailSent,
+      });
     } catch {
       setError("送出預約失敗");
     } finally {
@@ -105,31 +128,45 @@ export const AppointForm = ({ idleSeconds, onHome }: AppointFormProps) => {
     }
   };
 
-  if (waitingMessage) {
+  if (result) {
+    const { appointCode, visitorEmailSent } = result;
     return (
       <div className="mx-auto flex w-full max-w-2xl flex-col items-center rounded-3xl bg-white p-10 shadow-xl">
-        <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-emerald-700">
-          已完成
-        </p>
         <h2 className="text-3xl font-bold text-slate-900">預約完成</h2>
+        {appointCode ? (
+          <p className="mt-3 text-center text-2xl font-bold tracking-widest text-blue-700">
+            預約碼 {appointCode}
+          </p>
+        ) : null}
         <p className="mt-4 text-center text-xl leading-8 text-slate-700">
-          {waitingMessage}
+          到場後請在訪客機選擇「訪客報到」，輸入
+          {appointCode ? "預約碼或手機號碼" : "手機號碼"}。
         </p>
-        <button
-          type="button"
-          className="mt-8 min-h-16 rounded-xl bg-slate-800 px-8 text-xl font-semibold text-white active:bg-slate-700"
-          aria-label="返回首頁"
-          onClick={onHome}
-        >
-          返回首頁
-        </button>
-        <IdleCountdown seconds={idleSeconds} onComplete={onHome} />
+        {isPublic && visitorEmailSent !== undefined ? (
+          <p className="mt-2 text-center text-base text-slate-500">
+            {visitorEmailSent
+              ? "備查信已寄至您填寫的 Email。"
+              : "備查信未能寄出，請保留畫面上的預約資訊。"}
+          </p>
+        ) : null}
+        {onHome ? (
+          <button
+            type="button"
+            className="mt-8 min-h-16 rounded-xl bg-slate-800 px-8 text-xl font-semibold text-white active:bg-slate-700"
+            onClick={onHome}
+          >
+            {isPublic ? "返回預約首頁" : "返回首頁"}
+          </button>
+        ) : null}
+        {!isPublic && idleSeconds && onHome ? (
+          <IdleCountdown seconds={idleSeconds} onComplete={onHome} />
+        ) : null}
       </div>
     );
   }
 
   return (
-    <FlowCard title="訪客預約" onBack={onHome}>
+    <FlowCard title="訪客預約" onBack={() => onHome?.()}>
       <div className="grid min-w-0 gap-3 *:min-w-0 sm:grid-cols-2">
         <label className="block">
           <span className="mb-1 block text-sm font-medium text-slate-600">
@@ -262,6 +299,22 @@ export const AppointForm = ({ idleSeconds, onHome }: AppointFormProps) => {
             })}
           </div>
         </div>
+        {isPublic ? (
+          <label className="block sm:col-span-2">
+            <span className="mb-1 block text-sm font-medium text-slate-600">
+              來訪日期
+            </span>
+            <input
+              type="date"
+              className={`${FIELD_CLASS} text-lg`}
+              value={visitDate}
+              min={today}
+              max={maxDate}
+              onChange={(e) => setVisitDate(e.target.value)}
+              aria-label="來訪日期"
+            />
+          </label>
+        ) : null}
         <label className="block">
           <span className="mb-1 block text-sm font-medium text-slate-600">
             開始時間
@@ -271,7 +324,7 @@ export const AppointForm = ({ idleSeconds, onHome }: AppointFormProps) => {
             className={`${FIELD_CLASS} text-lg`}
             value={startAt}
             onChange={(e) => setStartAt(e.target.value)}
-            aria-label="開始時間（僅限當日）"
+            aria-label={isPublic ? "開始時間" : "開始時間（僅限當日）"}
           />
         </label>
         <label className="block">
@@ -283,7 +336,7 @@ export const AppointForm = ({ idleSeconds, onHome }: AppointFormProps) => {
             className={`${FIELD_CLASS} text-lg`}
             value={endAt}
             onChange={(e) => setEndAt(e.target.value)}
-            aria-label="結束時間（僅限當日）"
+            aria-label={isPublic ? "結束時間" : "結束時間（僅限當日）"}
           />
         </label>
       </div>

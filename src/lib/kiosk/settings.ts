@@ -16,8 +16,10 @@ export type KioskSettings = {
   logoFileName: string;
   /** 訪客須知影片：YouTube／影片網址／路徑；空＝/notice.mp4 */
   noticeVideoUrl: string;
-  /** 現場預約完成時可選通知的信箱（空＝不寄） */
+  /** 預約完成時通知的固定信箱（空＝不寄內部信） */
   approverEmails: string[];
+  /** 是否開放 /book 外部預約 */
+  publicBookingEnabled: boolean;
 };
 
 const DATA_DIR = path.join(process.cwd(), "data");
@@ -49,6 +51,7 @@ const emptySettings = (): KioskSettings => ({
   logoFileName: "",
   noticeVideoUrl: "",
   approverEmails: [],
+  publicBookingEnabled: true,
 });
 
 /** 去空白、驗證格式、去重（不分大小寫）、上限 APPROVER_EMAILS_MAX */
@@ -91,6 +94,10 @@ const readStore = async (): Promise<KioskSettings> => {
           ? parsed.noticeVideoUrl
           : String(process.env.NEXT_PUBLIC_NOTICE_VIDEO_URL ?? "").trim(),
       approverEmails: normalizeApproverEmails(parsed.approverEmails),
+      publicBookingEnabled:
+        typeof parsed.publicBookingEnabled === "boolean"
+          ? parsed.publicBookingEnabled
+          : true,
     };
   } catch {
     return emptySettings();
@@ -120,7 +127,12 @@ export const updateSettings = async (
   patch: Partial<
     Pick<
       KioskSettings,
-      "marquee" | "showAppoint" | "theme" | "noticeVideoUrl" | "approverEmails"
+      | "marquee"
+      | "showAppoint"
+      | "theme"
+      | "noticeVideoUrl"
+      | "approverEmails"
+      | "publicBookingEnabled"
     >
   >,
 ): Promise<KioskSettings> => {
@@ -139,6 +151,9 @@ export const updateSettings = async (
       : {}),
     ...(Array.isArray(patch.approverEmails)
       ? { approverEmails: normalizeApproverEmails(patch.approverEmails) }
+      : {}),
+    ...(typeof patch.publicBookingEnabled === "boolean"
+      ? { publicBookingEnabled: patch.publicBookingEnabled }
       : {}),
   };
   await writeStore(next);
@@ -215,7 +230,7 @@ export const clearCustomLogo = async (): Promise<KioskSettings> => {
   return next;
 };
 
-/** API 回傳給前端的設定視圖（不含 approverEmails） */
+/** API 回傳給前端的設定視圖（公開；不含 approverEmails） */
 export const toSettingsView = (settings: KioskSettings) => ({
   marquee: settings.marquee,
   resolvedMarquee: resolveMarquee(settings),
@@ -227,4 +242,11 @@ export const toSettingsView = (settings: KioskSettings) => ({
   logoUrl: settings.logoFileName
     ? `/api/kiosk/settings/logo?v=${encodeURIComponent(settings.logoFileName)}`
     : "/yenshow-logo.svg",
+  publicBookingEnabled: settings.publicBookingEnabled,
+});
+
+/** 管理員視圖：含固定通知信箱 */
+export const toAdminSettingsView = (settings: KioskSettings) => ({
+  ...toSettingsView(settings),
+  approverEmails: settings.approverEmails,
 });

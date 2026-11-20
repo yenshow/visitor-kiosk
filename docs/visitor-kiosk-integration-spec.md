@@ -1,28 +1,44 @@
 # YSOP Kiosk 獨立訪客機規格
 
-獨立訪客機（**YSOP Kiosk**）本機完成預約／報到／簽退。前端只打 `/api/kiosk/*`。本期**不控門禁、不開閘**。
+獨立訪客機（**YSOP Kiosk**）本機完成預約／報到／簽退。前端只打 `/api/kiosk/*`。本期**不控門禁、不開閘**。無產品授權／訂閱閘道。
 
 時區 `Asia/Taipei`。
 
 ```
-[ Kiosk 前端 ]  →  [ /api/kiosk/* ]  →  [ 本機 JSON ]
+[ Kiosk 前端 / 外部 /book ]  →  [ /api/kiosk/* ]  →  [ 本機 JSON ]
 ```
 
 - 報到／簽退下一步用一次性 token（記憶體、10 分鐘）；前端不帶 `appointID`。
-- 本機：`data/kiosk-presence.json`（`visits[]`）、`data/kiosk-appointments.json`、`data/kiosk-directory.json`、`data/kiosk-settings.json`、`data/kiosk-logo.*`、`data/audit.log`。設定頁 `/setting`（僅本機或 `KIOSK_ADMIN_IPS`）。
-- 無操作 20 秒回首頁。
+- 本機：`data/kiosk-presence.json`（`visits[]`）、`data/kiosk-appointments.json`、`data/kiosk-directory.json`、`data/kiosk-settings.json`、`data/kiosk-logo.*`、`data/audit.log`。設定頁 `/setting`（僅本機或 `KIOSK_ADMIN_IPS`，**無登入**）。
+- 無操作 20 秒回首頁（Kiosk 流程）。
 - 管理 API／紀錄／設定／人員目錄寫入需管理員 IP。
-- 查詢 API 有 rate limit 與失敗鎖定；管理操作寫入 `data/audit.log`（不含個資）。
+- 查詢／預約 API 有 rate limit；查詢另有失敗鎖定；管理操作寫入 `data/audit.log`（不含個資）。
 
 ## 2. 業務流程
 
-首頁：**訪客報到**、**訪客簽退**、可關閉的**訪客預約**；統計「目前在場／臨時外出／今日離場」**僅顯示數字，不開啟明細**（訪客紀錄在設定頁，與重置並排；可篩「全部／逾期在場／所有離場」；**逾期在場不顯示於首頁統計列**）。預約於現場 Kiosk 建立，**自動核准**，成功畫面顯示預約碼。
+首頁：**訪客報到**、**訪客簽退**、可關閉的**現場訪客預約**；統計「目前在場／臨時外出／今日離場」**僅顯示數字，不開啟明細**（訪客紀錄在設定頁，與重置並排；可篩「全部／逾期在場／所有離場」；**逾期在場不顯示於首頁統計列**）。預約**自動核准**，成功畫面顯示預約碼。
+
+**外部預約：** 公開頁 `/book`（`publicBookingEnabled` 可關）。可約**今日起最長 30 日**內（同日開始／結束）。服務設定勾選「允許外部預約入站」後防火牆開放；正式環境建議反向代理＋HTTPS。設定頁仍僅本機／管理員 IP。
 
 **查詢（單一輸入框）：** 8～15 碼純數字視為手機（整號比對，共乘可多人）；其餘視為 **4 碼**預約碼（僅精準比對 `appointCode` 或 `appointID`）。預約碼查在場只鎖 `visitorId`，不以同手機帶出他人。逾期不自動簽退。
 
 ### 2.1 預約
 
-部門 → 被訪人（來自設定頁人員目錄）→ 姓或名（二選一）、Email、手機必填；公司、車牌、事由選填。**現場預約時段僅限當日**（開始／結束時間不可跨日；預設 09:00–18:00）。建立後立即核准，顯示預約碼。不需訪客須知。
+部門 → 被訪人（來自設定頁人員目錄）→ 姓或名（二選一）、Email、手機必填；公司、車牌、事由選填。
+
+| 來源 | 時段 | 入口 |
+|------|------|------|
+| 現場 `source=kiosk`（預設） | **僅當日**；預設 09:00–18:00 | Kiosk 首頁「訪客預約」 |
+| 外部 `source=public` | 今日～+29 日（共 30 日）；須選日期 | `/book` |
+
+建立後立即核准，顯示預約碼。不需訪客須知。
+
+**寄信（SMTP，非 Resend）：** 成功後非同步雙通道——
+
+1. **對內**：設定頁 `approverEmails` 固定信箱
+2. **對外**：訪客填寫的 `email` 備查信（含預約碼）
+
+SMTP 未設、名單空、或寄信失敗只 log，**不擋預約**。
 
 ### 2.2 報到（含臨時外出返回）
 
@@ -56,43 +72,35 @@
 
 ### 2.5 本機設定與紀錄
 
-`/setting` 僅本機或 `KIOSK_ADMIN_IPS`：跑馬燈（空則寫死預設文案）、主題 `light`｜`dark`（cookie + `public/theme-init.js`）、logo（無則 `public/yenshow-logo.svg`）、`showAppoint`、**部門／被訪人**（與訪客紀錄並列的按鈕，dialog 內 CRUD）、**訪客紀錄**、**重置訪客統計**（清空 `kiosk-presence.json` 全部 visits：on_site／temp_out／departed 歸零；不刪目錄與未報到預約）。訪客紀錄：統計摘要＋明細（姓名／手機／車牌／公司／被訪人／時間），可篩全部／目前在場／臨時外出／逾期在場／今日離場／所有離場；不匯出。
+`/setting` 僅本機或 `KIOSK_ADMIN_IPS`（無登入）：跑馬燈、主題、logo、`showAppoint`、`publicBookingEnabled`、`approverEmails`、**部門／被訪人**、**訪客紀錄**、**重置訪客統計**。訪客紀錄：統計摘要＋明細；不匯出。
 
-本機主檔：`{ visits: VisitorVisit[] }`、`{ appointments: AppointmentItem[] }`、`{ orgs, hosts }`。授權狀態：`data/kiosk-license.json`（產品 `YSOP-Kiosk`、feature `visitor`；由 **安裝精靈** 寫入，非 `/setting`）。
-
-### 2.6 產品授權
-
-向外部授權平台啟用（與 BA 相同契約）。**唯一操作入口：`YsopKiosk.exe` → 授權設定。**
-
-- 線上：`POST {LICENSE_PLATFORM_API_BASE_URL}/activate`，`{ licenseKey, deviceFingerprint }`（經 `yscp-bridge license-activate`）
-- 離線：請求檔 → 平台 → 簽名 JSON；本機以 `LICENSE_SIGN_SECRET` 驗簽，且 `product` 須為 `YSOP-Kiosk`
-- 未授權：擋預約／報到相關 API 與首頁按鈕；桌面端不可啟動服務；**簽退仍放行**
+本機主檔：`{ visits: VisitorVisit[] }`、`{ appointments: AppointmentItem[] }`、`{ orgs, hosts }`。
 
 ## 3. Kiosk API
 
-前端只呼叫下列路由。成功 `{ "code": "0", "msg": "Success", "data": ... }`；失敗 `code` 為 HTTP 狀態字串，`data` 為 `null`（授權失敗另見 `FEATURE_NOT_LICENSED`）。
+前端只呼叫下列路由。成功 `{ "code": "0", "msg": "Success", "data": ... }`；失敗 `code` 為 HTTP 狀態字串，`data` 為 `null`。
 
-**存取：** `PUT settings`、`POST logo`、`GET records`、`POST records/reset`、`GET/POST directory`、頁面 `/setting` → 須本機或管理員 IP。產品授權僅由桌面精靈經 `yscp-bridge` 操作（無 HTTP `/api/kiosk/license*`）。其餘訪客流程與 `GET settings`／`GET logo` 公開（仍受防火牆遠端 IP 限制）。
+**存取：** `PUT settings`、`POST logo`、`GET records`、`POST records/reset`、`GET/POST directory`、頁面 `/setting` → 須本機或管理員 IP。其餘訪客流程、`/book`、`GET settings`／`GET logo` 公開（是否可從外網連入取決於防火牆／`KIOSK_ALLOW_PUBLIC_BOOKING`）。
 
 | 方法 | 路徑 | 用途 |
 |------|------|------|
-| GET | `/api/kiosk/status` | `{ licensed }` |
+| GET | `/api/kiosk/status` | `{ ready: true }` |
 | GET | `/api/kiosk/stats` | `{ onSite, tempOut, overstay, departed, departedTotal }`（departed＝今日離場） |
 | GET | `/api/kiosk/records` | 訪客紀錄 `{ summary, rows }`（管理員） |
 | POST | `/api/kiosk/records/reset` | 清空本機訪客紀錄（在場／外出／離場歸零）（管理員） |
-| GET / PUT | `/api/kiosk/settings` | GET 公開（不含 approverEmails）；PUT 管理員 |
+| GET / PUT | `/api/kiosk/settings` | GET 公開（管理員 IP 另含 `approverEmails`）；PUT 管理員 |
 | GET / POST | `/api/kiosk/settings/logo` | GET 公開；POST 上傳／`reset=1`（管理員，≤2MB） |
 | GET / POST | `/api/kiosk/directory` | 部門／被訪人（管理員） |
-| GET | `/api/kiosk/notice` | 訪客須知 Markdown（需 `visitor` 授權） |
-| GET | `/api/kiosk/orgs` | 部門（需授權） |
-| POST | `/api/kiosk/hosts` | `{ orgIndexCode }` 載入被訪人（需授權） |
-| POST | `/api/kiosk/appoint` | 建立預約（需授權）；成功回 `waitingMessage`、`appointCode` |
-| POST | `/api/kiosk/verify` | 報到查詢（需授權）；外出中回 `tempOutRecords`（有限流／失敗鎖定） |
-| POST | `/api/kiosk/checkin` | `{ token, acceptedNotice: true }`（需授權）；成功 `data` 為 `{}` |
-| POST | `/api/kiosk/checkout/lookup` | 簽退查詢 `{ query }`（有限流／失敗鎖定；**不需**授權） |
-| POST | `/api/kiosk/checkout` | `{ token, mode?: "temp"\|"return"\|"final" }`（**不需**授權） |
+| GET | `/api/kiosk/notice` | 訪客須知 Markdown |
+| GET | `/api/kiosk/orgs` | 部門 |
+| POST | `/api/kiosk/hosts` | `{ orgIndexCode }` 載入被訪人 |
+| POST | `/api/kiosk/appoint` | 建立預約；`source?: "kiosk"\|"public"`；成功回 `waitingMessage`、`appointCode`。外部預約另回 `visitorEmailSent`，表示 SMTP 是否接受訪客備查信（有限流） |
+| POST | `/api/kiosk/verify` | 報到查詢；外出中回 `tempOutRecords`（有限流／失敗鎖定） |
+| POST | `/api/kiosk/checkin` | `{ token, acceptedNotice: true }`；成功 `data` 為 `{}` |
+| POST | `/api/kiosk/checkout/lookup` | 簽退查詢 `{ query }`（有限流／失敗鎖定） |
+| POST | `/api/kiosk/checkout` | `{ token, mode?: "temp"\|"return"\|"final" }` |
 
-**預約** 必填 `receptionistId`、`email`、`phoneNo`、時段；姓／名至少其一。施工 `visitReasonType === 4` 帶 `visitReasonDetail: "施工"`。車牌正規化後寫入訪客資料。
+**預約** 必填 `receptionistId`、`email`、`phoneNo`、時段；姓／名至少其一。`source=public` 時須 `publicBookingEnabled`。施工 `visitReasonType === 4` 帶 `visitReasonDetail: "施工"`。車牌正規化後寫入訪客資料。
 
 **verify** `query`：8–15 位數字視為手機，否則為預約碼（`appointCode`）。查詢時段為前 30 日～後 30 日。
 

@@ -66,6 +66,20 @@ export const getAppointQueryRangeTaipei = (): {
   };
 };
 
+/** 台北日 YYYY-MM-DD 加減天數（以 UTC noon 近似，避免 DST） */
+export const addDaysToTaipeiDateKey = (
+  dateKey: string,
+  days: number,
+): string => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dateKey ?? "").trim());
+  if (!match) return "";
+  const y = Number(match[1]);
+  const m = Number(match[2]);
+  const d = Number(match[3]);
+  const utc = Date.UTC(y, m - 1, d + days, 12, 0, 0);
+  return toTaipeiDateKey(new Date(utc));
+};
+
 export const jsonError = (message: string, status = 400) =>
   Response.json({ code: String(status), msg: message, data: null }, { status });
 

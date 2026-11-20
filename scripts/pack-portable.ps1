@@ -155,7 +155,7 @@ Copy-Item (Join-Path $StandaloneDir "*") $AppRoot -Recurse -Force
 $dataPath = Join-Path $AppRoot "data"
 if (Test-Path $dataPath) { Remove-Item $dataPath -Recurse -Force }
 New-Item -ItemType Directory -Path $dataPath -Force | Out-Null
-# 注意：Inno 升級不安裝 app\data\*（保留現場授權／設定／紀錄）；此空目錄僅供中繼結構
+# 注意：Inno 升級不安裝 app\data\*（保留現場設定／紀錄）；此空目錄僅供中繼結構
 
 # 清掉 standalone／建置機可能帶入的完整 env；寫入「首次安裝」樣板
 # 升級時 Inno 以 onlyifdoesntexist 保留現場 app\.env（對齊 YSOP／BA）
@@ -181,22 +181,13 @@ function Get-DotEnvValue([string]$EnvFile, [string]$Key) {
   return ""
 }
 
-$RepoEnv = Join-Path $RepoRoot ".env"
-$LicenseApi = Get-DotEnvValue $RepoEnv "LICENSE_PLATFORM_API_BASE_URL"
-if (-not $LicenseApi) { $LicenseApi = "https://api.yenshow.com/api/license" }
-$LicenseSecret = Get-DotEnvValue $RepoEnv "LICENSE_SIGN_SECRET"
-if (-not $LicenseSecret) {
-  Write-Warning "Repo .env 缺少 LICENSE_SIGN_SECRET：離線授權無法驗簽"
-}
-
 $FreshEnv = @"
-# YSOP Kiosk portable — 授權請用 YsopKiosk.exe → 授權設定
-# 產品授權平台與 YSOP／BA 相同（原廠寫入；現場勿改）
+# YSOP Kiosk portable — 服務設定請用 YsopKiosk.exe → 服務設定
+# SMTP／MAIL_FROM 請現場手動補齊（預約雙通道寄信）
 PORT=3010
 HOSTNAME=0.0.0.0
-LICENSE_PLATFORM_API_BASE_URL=$LicenseApi
-LICENSE_SIGN_SECRET=$LicenseSecret
-LICENSE_OPEN_ALL_FEATURES=0
+KIOSK_ADMIN_IPS=
+KIOSK_ALLOW_PUBLIC_BOOKING=0
 "@
 $FreshEnvPath = Join-Path $AppRoot ".env"
 [System.IO.File]::WriteAllText($FreshEnvPath, $FreshEnv.TrimStart() + "`n", [System.Text.UTF8Encoding]::new($false))

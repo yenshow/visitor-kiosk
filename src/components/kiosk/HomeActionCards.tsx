@@ -17,8 +17,6 @@ type HomeActionCardsProps = {
   onCheckout: () => void;
   onAppoint: () => void;
   showAppoint?: boolean;
-  /** false 時停用報到／預約（簽退仍可用） */
-  licensed?: boolean;
   stats?: KioskStatsView | null;
 };
 
@@ -86,7 +84,6 @@ export const HomeActionCards = ({
   onCheckout,
   onAppoint,
   showAppoint = true,
-  licensed = true,
   stats,
 }: HomeActionCardsProps) => (
   <div className="flex w-full flex-col items-center gap-4 landscape:gap-8">
@@ -109,16 +106,9 @@ export const HomeActionCards = ({
     <div className="flex w-full flex-col gap-4 landscape:flex-row landscape:items-stretch landscape:gap-8">
       <button
         type="button"
-        className={`${TILE_BASE} ${TILE_FOCUS} kiosk-tile-primary ${
-          licensed ? "" : "cursor-not-allowed opacity-45 hover:translate-y-0"
-        }`}
+        className={`${TILE_BASE} ${TILE_FOCUS} kiosk-tile-primary`}
         aria-label="訪客報到，簽到或臨時外出返回"
-        aria-disabled={!licensed}
-        disabled={!licensed}
-        onClick={() => {
-          if (!licensed) return;
-          onCheckin();
-        }}
+        onClick={onCheckin}
       >
         <span className="flex h-16 w-16 items-center justify-center rounded-full bg-(--tile-primary-icon-bg) landscape:h-20 landscape:w-20">
           <TileIcon>
@@ -131,7 +121,7 @@ export const HomeActionCards = ({
         </span>
         <span className={TILE_TITLE}>訪客報到</span>
         <span className="text-base font-medium text-(--tile-primary-muted) landscape:text-lg">
-          {licensed ? "簽到或臨時外出返回" : "需先完成授權"}
+          簽到或臨時外出返回
         </span>
       </button>
 
@@ -159,20 +149,11 @@ export const HomeActionCards = ({
     {showAppoint ? (
       <button
         type="button"
-        className={`pt-2 text-xl font-semibold tracking-wide underline-offset-8 outline-none landscape:pt-3 landscape:text-2xl ${
-          licensed
-            ? "cursor-pointer text-(--text-secondary) hover:text-(--text-primary) hover:underline focus-visible:text-(--text-primary) focus-visible:underline"
-            : "cursor-not-allowed text-(--text-secondary) opacity-45"
-        }`}
+        className="cursor-pointer pt-2 text-xl font-semibold tracking-wide text-(--text-secondary) underline-offset-8 outline-none hover:text-(--text-primary) hover:underline focus-visible:text-(--text-primary) focus-visible:underline landscape:pt-3 landscape:text-2xl"
         aria-label="訪客預約，現場申請當日來訪"
-        aria-disabled={!licensed}
-        disabled={!licensed}
-        onClick={() => {
-          if (!licensed) return;
-          onAppoint();
-        }}
+        onClick={onAppoint}
       >
-        {licensed ? "訪客預約" : "訪客預約（需授權）"}
+        訪客預約
       </button>
     ) : null}
   </div>

@@ -138,7 +138,13 @@ export const HostPicker = ({
   const handlePickHost = (host: HostPerson) => {
     setPersonId(host.personId);
     setHostMenuOpen(false);
-    onSelectRef.current(host);
+    const org =
+      orgs.find((item) => item.orgIndexCode === orgIndexCode) ?? null;
+    onSelectRef.current({
+      ...host,
+      orgIndexCode: orgIndexCode || host.orgIndexCode,
+      orgName: org?.orgName ?? host.orgName,
+    });
   };
 
   const selectedOrg =

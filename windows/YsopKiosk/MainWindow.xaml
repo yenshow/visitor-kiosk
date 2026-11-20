@@ -21,7 +21,7 @@
                Text="{x:Static local:AppBrand.RoleTitle}"/>
     <TextBlock FontSize="13" Margin="0,3,0,14"
                Foreground="{StaticResource TextMutedBrush}"
-               Text="先完成產品授權再啟動運行 · 關閉視窗後仍在系統匣"/>
+               Text="設定服務後即可啟動運行 · 關閉視窗後仍在系統匣"/>
 
     <Border Background="{StaticResource StatusBackgroundBrush}"
             BorderBrush="{StaticResource DividerBrush}" BorderThickness="1"
@@ -29,29 +29,6 @@
       <TextBlock x:Name="TxtStatus" FontSize="13" FontWeight="SemiBold"
                  TextWrapping="Wrap" Text="偵測中…"
                  Foreground="{StaticResource TextPrimaryBrush}"/>
-    </Border>
-
-    <Border x:Name="CardLicense" Margin="0,0,0,12" Padding="14,12"
-            Background="{StaticResource CardBackgroundBrush}"
-            BorderBrush="{StaticResource CardBorderBrush}"
-            BorderThickness="1" CornerRadius="10">
-      <StackPanel>
-        <DockPanel LastChildFill="True" Margin="0,0,0,6">
-          <Border x:Name="BadgeLicense" Style="{StaticResource StatusBadge}" DockPanel.Dock="Right"
-                  Background="{StaticResource PendingBackgroundBrush}"
-                  BorderBrush="{StaticResource PendingBorderBrush}" BorderThickness="1">
-            <TextBlock x:Name="TxtLicenseBadge" Style="{StaticResource StatusBadgeText}"
-                       Foreground="{StaticResource PendingTextBrush}" Text="未授權"/>
-          </Border>
-          <TextBlock Style="{StaticResource SectionHeader}" Margin="0"
-                     VerticalAlignment="Center" Text="1. 授權設定"/>
-        </DockPanel>
-        <TextBlock x:Name="TxtLicenseHint" Style="{StaticResource FormHint}"
-                   Text="產品授權（YSOP-Kiosk／visitor）：線上啟用或離線匯入。"/>
-        <Button x:Name="BtnOpenLicense" Content="開啟授權設定…" Margin="0,10,0,0"
-                HorizontalAlignment="Left" MinWidth="180"
-                Style="{StaticResource PrimaryButton}" Click="OnOpenLicenseWizard"/>
-      </StackPanel>
     </Border>
 
     <Border x:Name="CardService" Margin="0,0,0,12" Padding="14,12"
@@ -67,10 +44,10 @@
                        Foreground="{StaticResource PendingTextBrush}" Text="預設 3010"/>
           </Border>
           <TextBlock Style="{StaticResource SectionHeader}" Margin="0"
-                     VerticalAlignment="Center" Text="2. 服務設定"/>
+                     VerticalAlignment="Center" Text="1. 服務設定"/>
         </DockPanel>
         <TextBlock Style="{StaticResource FormHint}"
-                   Text="服務埠與管理員 IP（選用）。遠端開設定頁時請填管理員 IP。"/>
+                   Text="服務埠、管理員 IP、是否允許外部預約入站。"/>
         <Button x:Name="BtnOpenService" Content="開啟服務設定…" Margin="0,10,0,0"
                 HorizontalAlignment="Left" MinWidth="180"
                 Style="{StaticResource PrimaryButton}" Click="OnOpenServiceWizard"/>
@@ -82,9 +59,9 @@
             BorderBrush="{StaticResource CardBorderBrush}"
             BorderThickness="1" CornerRadius="10">
       <StackPanel>
-        <TextBlock Style="{StaticResource SectionHeader}" Text="3. 運行"/>
+        <TextBlock Style="{StaticResource SectionHeader}" Text="2. 運行"/>
         <TextBlock Style="{StaticResource FormHint}"
-                   Text="授權完成後即可啟動訪客服務。"/>
+                   Text="啟動訪客服務後可開啟全螢幕畫面與設定頁。"/>
         <WrapPanel Margin="0,10,0,0">
           <Button x:Name="BtnStartKiosk" Content="啟動服務" MinWidth="128"
                   Style="{StaticResource PrimaryButton}" Click="OnStartKiosk"/>

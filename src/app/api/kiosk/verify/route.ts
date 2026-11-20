@@ -6,7 +6,6 @@ import {
 } from "@/lib/kiosk/appoint-lookup";
 import { jsonError, jsonOk } from "@/lib/kiosk/api-helpers";
 import { getClientIp } from "@/lib/kiosk/access";
-import { requireVisitorLicense } from "@/lib/license/gate";
 import { lookupOnSiteRecords } from "@/lib/kiosk/on-site-lookup";
 import { normalizePhoneDigits, normalizePlateNo } from "@/lib/kiosk/normalize";
 import {
@@ -32,9 +31,6 @@ const queryKeyOf = (phoneNo: string, appointCode: string) =>
   phoneNo ? `p:${phoneNo}` : `c:${appointCode}`;
 
 export const POST = async (request: Request) => {
-  const denied = await requireVisitorLicense();
-  if (denied) return denied;
-
   const ip = getClientIp(request.headers);
   const limited = takeRateToken(
     `query:${ip}:verify`,

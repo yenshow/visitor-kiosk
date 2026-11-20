@@ -34,4 +34,5 @@ export type HostPerson = {
   personId: string;
   personName: string;
   orgIndexCode?: string;
+  orgName?: string;
 };

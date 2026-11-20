@@ -6,13 +6,16 @@ using System.Security.Principal;
 namespace YsopKiosk;
 
 /// <summary>
-/// 入站防火牆：僅放行本機與管理員 IP。
+/// 入站防火牆：
+/// - 未開放外部預約：僅本機與管理員 IP
+/// - 開放外部預約：Any（由應用層 IP 鎖保護 /setting）
 /// 已管理員 → COM 直寫；否則 UAC 提升 <c>--firewall-apply</c>。
 /// </summary>
 internal static class FirewallHelper
 {
     internal const string RuleName = "YSOP Kiosk";
     private const string CliFlag = "--firewall-apply";
+    private const string AnyRemote = "Any";
 
     internal static bool TryHandleCli(string[] args, out int exitCode)
     {
@@ -27,39 +30,61 @@ internal static class FirewallHelper
             return true;
         }
 
-        var remotes = ParseRemoteIps(args[2]);
+        var remoteArg = args[2].Trim();
+        if (string.Equals(remoteArg, AnyRemote, StringComparison.OrdinalIgnoreCase) ||
+            remoteArg == "*")
+        {
+            exitCode = TryWriteRule(port, remotes: null, allowAny: true, out _) ? 0 : 4;
+            return true;
+        }
+
+        var remotes = ParseRemoteIps(remoteArg);
         if (remotes.Count == 0)
         {
             exitCode = 3;
             return true;
         }
 
-        exitCode = TryWriteRule(port, remotes, out _) ? 0 : 4;
+        exitCode = TryWriteRule(port, remotes, allowAny: false, out _) ? 0 : 4;
         return true;
     }
 
     internal static (bool ok, string message) ApplyInboundAllow(
         int localPort,
-        string adminIpsMultiline)
+        string adminIpsMultiline,
+        bool allowPublicBooking)
     {
         if (localPort is < 1 or > 65535)
             return (false, "服務埠無效");
+
+        if (allowPublicBooking)
+        {
+            var okMsg =
+                $"已開放入站 TCP {localPort}（Any；設定頁仍由應用層管理員 IP 保護）";
+            if (IsAdministrator())
+            {
+                return TryWriteRule(localPort, remotes: null, allowAny: true, out var err)
+                    ? (true, okMsg)
+                    : (false, err);
+            }
+            return ApplyViaElevation(localPort, AnyRemote, okMsg);
+        }
 
         var remotes = ParseRemoteIps("127.0.0.1", adminIpsMultiline);
         if (remotes.Count == 0)
             return (false, "遠端 IP 無效");
 
         var remoteCsv = string.Join(",", remotes);
-        var okMsg = $"已限制入站 TCP {localPort} ← {remoteCsv}";
+        var restrictedMsg = $"已限制入站 TCP {localPort} ← {remoteCsv}";
 
         if (IsAdministrator())
         {
-            return TryWriteRule(localPort, remotes, out var err)
-                ? (true, okMsg)
+            return TryWriteRule(localPort, remotes, allowAny: false, out var err)
+                ? (true, restrictedMsg)
                 : (false, err);
         }
 
-        return ApplyViaElevation(localPort, remoteCsv, okMsg);
+        return ApplyViaElevation(localPort, remoteCsv, restrictedMsg);
     }
 
     private static (bool ok, string message) ApplyViaElevation(
@@ -108,7 +133,8 @@ internal static class FirewallHelper
 
     private static bool TryWriteRule(
         int localPort,
-        IReadOnlyList<string> remotes,
+        IReadOnlyList<string>? remotes,
+        bool allowAny,
         out string error)
     {
         error = "";
@@ -135,13 +161,16 @@ internal static class FirewallHelper
             dynamic rule = Activator.CreateInstance(ruleType)
                 ?? throw new InvalidOperationException("無法建立 FwRule");
             rule.Name = RuleName;
-            rule.Description = "YSOP Kiosk：僅本機與管理員 IP";
+            rule.Description = allowAny
+                ? "YSOP Kiosk：開放外部預約；設定頁由應用層 IP 保護"
+                : "YSOP Kiosk：僅本機與管理員 IP";
             rule.Enabled = true;
             rule.Direction = 1; // IN
             rule.Action = 1; // ALLOW
             rule.Protocol = 6; // TCP
             rule.LocalPorts = localPort.ToString();
-            rule.RemoteAddresses = string.Join(",", remotes);
+            if (!allowAny)
+                rule.RemoteAddresses = string.Join(",", remotes ?? Array.Empty<string>());
             rule.Profiles = int.MaxValue;
             rules.Add(rule);
             return true;

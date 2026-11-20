@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  useEffect,
-  useId,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { DirectoryDialog } from "@/components/kiosk/DirectoryDialog";
 import { RecordsDialog } from "@/components/kiosk/RecordsDialog";
 import {
@@ -24,6 +18,9 @@ export type KioskSettingsView = {
   resolvedNoticeVideoUrl: string;
   hasCustomLogo: boolean;
   logoUrl: string;
+  publicBookingEnabled?: boolean;
+  /** 僅管理員 GET／PUT 回傳 */
+  approverEmails?: string[];
 };
 
 type SettingsFormProps = {
@@ -45,24 +42,6 @@ const BTN_WARN = `${BTN} border border-amber-400 bg-white text-amber-900 active:
 const BTN_DANGER = `${BTN} bg-red-600 text-white active:bg-red-700`;
 const HINT = "text-sm font-normal text-slate-500";
 const LABEL_ROW = "mb-2 flex flex-wrap items-baseline gap-x-2 gap-y-0.5";
-
-const THEME_OPTIONS = [
-  {
-    value: "light" as const,
-    label: "明亮",
-    icon: (
-      <>
-        <circle cx="12" cy="12" r="4" />
-        <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
-      </>
-    ),
-  },
-  {
-    value: "dark" as const,
-    label: "黑暗",
-    icon: <path d="M21 14.5A8.5 8.5 0 1 1 9.5 3 7 7 0 0 0 21 14.5z" />,
-  },
-];
 
 const Icon = ({
   children,
@@ -93,6 +72,12 @@ export const SettingsForm = ({ initial, onSaved }: SettingsFormProps) => {
     initial?.noticeVideoUrl ?? "",
   );
   const [showAppoint, setShowAppoint] = useState(initial?.showAppoint ?? true);
+  const [publicBookingEnabled, setPublicBookingEnabled] = useState(
+    initial?.publicBookingEnabled ?? true,
+  );
+  const [approverEmailsText, setApproverEmailsText] = useState(
+    (initial?.approverEmails ?? []).join("\n"),
+  );
   const [theme, setTheme] = useState<KioskTheme>(
     initial?.theme === "dark" ? "dark" : "light",
   );
@@ -172,7 +157,14 @@ export const SettingsForm = ({ initial, onSaved }: SettingsFormProps) => {
       const res = await fetch("/api/kiosk/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ marquee, noticeVideoUrl, showAppoint, theme }),
+        body: JSON.stringify({
+          marquee,
+          noticeVideoUrl,
+          showAppoint,
+          publicBookingEnabled,
+          theme,
+          approverEmails: approverEmailsText,
+        }),
       });
       const json = (await res.json()) as {
         msg?: string;
@@ -184,6 +176,12 @@ export const SettingsForm = ({ initial, onSaved }: SettingsFormProps) => {
       }
       applyThemeClass(json.data.theme);
       writeThemeCookie(json.data.theme);
+      if (Array.isArray(json.data.approverEmails)) {
+        setApproverEmailsText(json.data.approverEmails.join("\n"));
+      }
+      if (typeof json.data.publicBookingEnabled === "boolean") {
+        setPublicBookingEnabled(json.data.publicBookingEnabled);
+      }
       onSaved?.(json.data);
       setSavedHint("設定已儲存");
     } catch {
@@ -312,12 +310,12 @@ export const SettingsForm = ({ initial, onSaved }: SettingsFormProps) => {
 
       <div>
         <span className={`mb-2 block ${LABEL}`}>顯示模式</span>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <button
             type="button"
             role="switch"
             aria-checked={showAppoint}
-            aria-label="訪客預約功能"
+            aria-label="現場訪客預約功能"
             className={`flex min-h-16 cursor-pointer items-center justify-between gap-3 rounded-xl border px-4 text-left text-base font-semibold active:scale-[0.99] ${
               showAppoint
                 ? "border-blue-600 bg-blue-50 text-blue-900"
@@ -330,7 +328,7 @@ export const SettingsForm = ({ initial, onSaved }: SettingsFormProps) => {
                 <rect x="3" y="4" width="18" height="18" rx="2" />
                 <path d="M16 2v4M8 2v4M3 10h18" />
               </Icon>
-              <span className="leading-snug">訪客預約功能</span>
+              <span className="leading-snug">現場預約</span>
             </span>
             <span
               className={`relative h-8 w-14 shrink-0 rounded-full transition-colors ${
@@ -346,35 +344,88 @@ export const SettingsForm = ({ initial, onSaved }: SettingsFormProps) => {
             </span>
           </button>
 
-          <div
-            className="grid grid-cols-2 gap-2"
-            role="radiogroup"
-            aria-label="明亮或黑暗模式"
+          <button
+            type="button"
+            role="switch"
+            aria-checked={publicBookingEnabled}
+            aria-label="外部線上預約功能"
+            className={`flex min-h-16 cursor-pointer items-center justify-between gap-3 rounded-xl border px-4 text-left text-base font-semibold active:scale-[0.99] ${
+              publicBookingEnabled
+                ? "border-blue-600 bg-blue-50 text-blue-900"
+                : "border-slate-300 bg-white text-slate-800"
+            }`}
+            onClick={() => setPublicBookingEnabled((prev) => !prev)}
           >
-            {THEME_OPTIONS.map((opt) => {
-              const selected = theme === opt.value;
-              return (
-                <button
-                  key={opt.value}
-                  type="button"
-                  role="radio"
-                  aria-checked={selected}
-                  aria-label={`${opt.label}模式`}
-                  className={`flex min-h-16 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border px-2 text-sm font-semibold active:scale-[0.98] sm:text-base ${
-                    selected
-                      ? "border-blue-600 bg-blue-600 text-white"
-                      : "border-slate-300 bg-white text-slate-800"
-                  }`}
-                  onClick={() => handleThemeChange(opt.value)}
-                >
-                  <Icon>{opt.icon}</Icon>
-                  <span>{opt.label}</span>
-                </button>
-              );
-            })}
-          </div>
+            <span className="flex min-w-0 items-center gap-3">
+              <Icon className="size-7 shrink-0">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" />
+              </Icon>
+              <span className="leading-snug">外部預約</span>
+            </span>
+            <span
+              className={`relative h-8 w-14 shrink-0 rounded-full transition-colors ${
+                publicBookingEnabled ? "bg-blue-600" : "bg-slate-300"
+              }`}
+              aria-hidden
+            >
+              <span
+                className={`absolute top-1 size-6 rounded-full bg-white shadow transition-transform ${
+                  publicBookingEnabled ? "left-7" : "left-1"
+                }`}
+              />
+            </span>
+          </button>
+
+          <button
+            type="button"
+            role="switch"
+            aria-checked={theme === "dark"}
+            aria-label="黑暗模式"
+            className={`flex min-h-16 cursor-pointer items-center justify-between gap-3 rounded-xl border px-4 text-left text-base font-semibold active:scale-[0.99] ${
+              theme === "dark"
+                ? "border-blue-600 bg-blue-50 text-blue-900"
+                : "border-slate-300 bg-white text-slate-800"
+            }`}
+            onClick={() =>
+              handleThemeChange(theme === "dark" ? "light" : "dark")
+            }
+          >
+            <span className="flex min-w-0 items-center gap-3">
+              <Icon className="size-7 shrink-0">
+                <path d="M21 14.5A8.5 8.5 0 1 1 9.5 3 7 7 0 0 0 21 14.5z" />
+              </Icon>
+              <span className="leading-snug">黑暗模式</span>
+            </span>
+            <span
+              className={`relative h-8 w-14 shrink-0 rounded-full transition-colors ${
+                theme === "dark" ? "bg-blue-600" : "bg-slate-300"
+              }`}
+              aria-hidden
+            >
+              <span
+                className={`absolute top-1 size-6 rounded-full bg-white shadow transition-transform ${
+                  theme === "dark" ? "left-7" : "left-1"
+                }`}
+              />
+            </span>
+          </button>
         </div>
       </div>
+
+      <label className="block">
+        <span className={LABEL_ROW}>
+          <span className={LABEL}>預約通知信箱</span>
+          <span className={HINT}>固定內部信箱；換行或逗號分隔，上限 20</span>
+        </span>
+        <textarea
+          className={`${FIELD} min-h-24 px-4 py-3 text-lg`}
+          value={approverEmailsText}
+          onChange={(e) => setApproverEmailsText(e.target.value)}
+          placeholder={"reception@example.com"}
+          aria-label="預約通知信箱"
+        />
+      </label>
 
       <div className="grid grid-cols-3 gap-3">
         <button

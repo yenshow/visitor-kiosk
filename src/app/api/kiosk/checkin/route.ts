@@ -1,6 +1,5 @@
 import { jsonError, jsonOk, toTaipeiIso } from "@/lib/kiosk/api-helpers";
 import { markAppointmentCheckedIn } from "@/lib/kiosk/appointments";
-import { requireVisitorLicense } from "@/lib/license/gate";
 import { normalizePhoneDigits, normalizePlateNo } from "@/lib/kiosk/normalize";
 import { upsertVisitOnCheckin } from "@/lib/kiosk/presence";
 import {
@@ -15,9 +14,6 @@ type CheckinBody = {
 };
 
 export const POST = async (request: Request) => {
-  const denied = await requireVisitorLicense();
-  if (denied) return denied;
-
   try {
     const body = (await request.json()) as CheckinBody;
 
