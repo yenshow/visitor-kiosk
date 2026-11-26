@@ -11,6 +11,7 @@ public partial class MainWindow : Window
     private readonly KioskUiHost _ui;
     private TrayIconService? _tray;
     private bool _allowExit;
+    private bool _licensed;
 
     public MainWindow()
     {
@@ -52,6 +53,11 @@ public partial class MainWindow : Window
     {
         EnsureInstallHooks();
         await RefreshStatusAsync();
+        if (!_licensed)
+        {
+            _tray?.ShowBalloon(AppBrand.ProductName, "請開啟主視窗並確認產品授權。");
+            return;
+        }
         try
         {
             await StartKioskAsync(showErrors: false);
@@ -87,35 +93,36 @@ public partial class MainWindow : Window
         var running = await _kiosk.IsRunningAsync();
 
         var bridge = await YscpBridgeClient.RunAsync(_root, "status");
+        _licensed = bridge.Ok && bridge.GetBool("licensed");
+        ApplyBadge(BadgeLicense, TxtLicenseBadge, _licensed, "✓ 已授權",
+            bridge.Ok ? "未授權" : "無法讀取");
+        BtnStartKiosk.IsEnabled = _licensed;
+        BtnStop.IsEnabled = running;
+        BtnSetting.IsEnabled = _licensed;
+
         if (!bridge.Ok)
         {
-            TxtStatus.Text = running ? "服務運行中（設定讀取失敗）" : "服務已停止";
-            ApplySetupBadges(listenPort: 3010, allowPublic: false);
-            BtnStartKiosk.IsEnabled = true;
-            BtnStop.IsEnabled = running;
-            BtnSetting.IsEnabled = true;
+            TxtStatus.Text = "無法讀取設定，請開啟授權設定確認。";
+            ApplyServiceBadge(listenPort: 3010);
             await UpdateTrayTooltipAsync();
             return;
         }
 
-        var allowPublic = bridge.GetBool("allowPublicBooking");
-        ApplySetupBadges(bridge.GetInt("listenPort", 3010), allowPublic);
+        ApplyServiceBadge(bridge.GetInt("listenPort", 3010));
 
-        TxtStatus.Text = running
-            ? (allowPublic ? "服務運行中 · 已開放外部預約入站" : "服務運行中")
+        TxtStatus.Text = !_licensed
+            ? "請先完成產品授權"
+            : running
+            ? "服務運行中"
             : "服務已停止";
 
-        BtnStartKiosk.IsEnabled = true;
-        BtnStop.IsEnabled = running;
-        BtnSetting.IsEnabled = true;
         await UpdateTrayTooltipAsync();
     }
 
-    private void ApplySetupBadges(int listenPort, bool allowPublic)
+    private void ApplyServiceBadge(int listenPort)
     {
         var port = listenPort is >= 1 and <= 65535 ? listenPort : 3010;
-        var label = allowPublic ? $"埠 {port} · 公開" : $"埠 {port}";
-        // 服務設定就緒即顯示成功色；「公開」僅文案提示
+        var label = $"埠 {port}";
         ApplyBadge(BadgeService, TxtServiceBadge, true, label, label);
         BtnOpenService.Content = "檢視／修改服務設定…";
         CardService.BorderBrush = (Brush)FindResource("CardBorderBrush");
@@ -199,8 +206,17 @@ public partial class MainWindow : Window
     {
         var wiz = new SetupWizardWindow(_root) { Owner = this };
         wiz.ShowDialog();
-        if (wiz.Applied)
+        if (wiz.Applied && _licensed)
             await RestartAfterConfigAsync(startIfStopped: true);
+        else if (wiz.Applied)
+            EnsureInstallHooks(showAutostartError: true);
+        await RefreshStatusAsync();
+    }
+
+    private async void OnOpenLicenseWizard(object sender, RoutedEventArgs e)
+    {
+        var wizard = new LicenseWizardWindow(_root) { Owner = this };
+        wizard.ShowDialog();
         await RefreshStatusAsync();
     }
 

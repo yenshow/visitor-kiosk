@@ -41,14 +41,21 @@ export default function PublicBookPage() {
     const controller = new AbortController();
     const load = async () => {
       try {
-        const res = await fetch("/api/kiosk/settings", {
-          signal: controller.signal,
-        });
-        const result = res.ok
+        const options = { signal: controller.signal };
+        const [res, status] = await Promise.all([
+          fetch("/api/kiosk/settings", options),
+          fetch("/api/kiosk/status", { ...options, cache: "no-store" }),
+        ]);
+        const result = res.ok && status.ok
           ? ((await res.json()) as { data?: BookSettings | null }).data
           : null;
+        const license = status.ok
+          ? ((await status.json()) as { data?: { licensed?: boolean } }).data
+          : null;
         if (!controller.signal.aborted) {
-          setSettingsResult(result ?? "error");
+          setSettingsResult(result && license
+            ? { ...result, publicBookingEnabled: result.publicBookingEnabled && license.licensed === true }
+            : "error");
         }
       } catch {
         if (!controller.signal.aborted) setSettingsResult("error");

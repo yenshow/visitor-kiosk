@@ -1,4 +1,4 @@
-import { getSettings } from "@/lib/kiosk/settings";
+import { resolveNotifyEmails } from "@/lib/kiosk/directory";
 import { formatAppointTimeRange, sendKioskMail } from "@/lib/kiosk/mail";
 import { displayVisitorName } from "@/lib/kiosk/visitor-fields";
 import { visitReasonLabel } from "@/lib/kiosk/visit-reason";
@@ -13,8 +13,8 @@ export type AppointMailPayload = {
   visitReasonType: number;
   appointStartTime: string;
   appointEndTime: string;
+  receptionistId: string;
   receptionistName: string;
-  orgLabel: string;
   appointCode?: string;
   source?: "kiosk" | "public";
 };
@@ -22,7 +22,7 @@ export type AppointMailPayload = {
 const dash = (value: string) => value.trim() || "—";
 
 /**
- * 預約成功後雙通道寄信（內部固定信箱＋訪客 email）。
+ * 預約成功後雙通道寄信（目錄解析內部收件人＋訪客 email）。
  * 回傳訪客備查信是否由 SMTP 接受，內部通知獨立處理。
  */
 export const notifyAppointmentMails = async (
@@ -37,21 +37,33 @@ export const notifyAppointmentMails = async (
     payload.appointStartTime,
     payload.appointEndTime,
   );
-  const host = dash(payload.receptionistName);
-  const org = dash(payload.orgLabel);
   const code = String(payload.appointCode ?? "").trim();
   const codeLabel = code || "—";
 
-  const notifyInternal = async () => {
-    try {
-      const { approverEmails } = await getSettings();
-      if (approverEmails.length === 0) return;
+  let hostLabel = dash(payload.receptionistName);
+  let orgLabel = "—";
+  let internalEmails: string[] = [];
 
+  try {
+    const resolved = await resolveNotifyEmails(payload.receptionistId);
+    hostLabel = dash(resolved.hostName || payload.receptionistName);
+    orgLabel = dash(resolved.orgName);
+    internalEmails = resolved.emails;
+  } catch (error) {
+    console.error(
+      "[appoint-mail] 解析通知收件人失敗",
+      error instanceof Error ? error.message : error,
+    );
+  }
+
+  const notifyInternal = async () => {
+    if (internalEmails.length === 0) return;
+    try {
       const sourceLabel =
         payload.source === "public" ? "外部預約" : "現場預約";
       await sendKioskMail({
-        to: approverEmails,
-        subject: `【訪客服務機】新預約：${visitorName}／${host}`,
+        to: internalEmails,
+        subject: `【訪客服務機】新預約：${visitorName}／${hostLabel}`,
         text: [
           `此為 YSOP Kiosk 訪客系統${sourceLabel}通知（已自動核准）。`,
           "",
@@ -62,8 +74,8 @@ export const notifyAppointmentMails = async (
           `車牌：${dash(payload.plateNo)}`,
           `來訪事由：${reason}`,
           `來訪時段：${timeRange}`,
-          `被訪人：${host}`,
-          `部門：${org}`,
+          `被訪人：${hostLabel}`,
+          `部門：${orgLabel}`,
           `預約碼：${codeLabel}`,
         ].join("\n"),
       });
@@ -89,8 +101,8 @@ export const notifyAppointmentMails = async (
         `手機：${dash(payload.phoneNo)}`,
         `來訪事由：${reason}`,
         `來訪時段：${timeRange}`,
-        `被訪人：${host}`,
-        `部門：${org}`,
+        `被訪人：${hostLabel}`,
+        `部門：${orgLabel}`,
         `預約碼：${codeLabel}`,
         "",
         code

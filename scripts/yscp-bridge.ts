@@ -8,15 +8,22 @@
  *
  * Commands:
  *   status | save-service
+ *   license-activate | license-offline-request | license-offline-import
  */
 import { existsSync } from "fs";
 import path from "path";
 import { getConfig, getKioskListenPort } from "../src/lib/config";
+import { parseAdminIps } from "../src/lib/kiosk/access";
+import {
+  activateLicenseByKey,
+  buildOfflineRequestBase64,
+  importOfflineLicensePayload,
+} from "../src/lib/license/activate-service";
+import { getLicenseState, toLicenseSummary } from "../src/lib/license/store";
 import {
   loadDotEnv,
-  removeEnvLine,
-  upsertEnvLine,
-  writeUtf8,
+  readUtf8,
+  updateEnvFile,
 } from "./env-file";
 
 type Json = Record<string, unknown>;
@@ -44,7 +51,7 @@ const parseArgs = (argv: string[]) => {
     if (token.startsWith("--")) {
       const key = token.slice(2);
       const next = args[i + 1];
-      if (!next || next.startsWith("--")) flags[key] = true;
+      if (next === undefined || next.startsWith("--")) flags[key] = true;
       else {
         flags[key] = next;
         i += 1;
@@ -86,6 +93,23 @@ const parseListenPort = (raw: string): number => {
   return Math.floor(n);
 };
 
+const parsePublicBookingUrl = (raw: string | boolean): string => {
+  if (typeof raw !== "string") return fail("請提供外部預約網址或留空");
+  const value = raw.trim();
+  if (!value) return "";
+  const error = "請輸入完整的 HTTP 或 HTTPS 外部預約網址";
+  if (!/^https?:\/\/[^/]/i.test(value) || /[\s\\]/.test(value)) {
+    return fail(error);
+  }
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return fail(error);
+  }
+  return url.username || url.password ? fail(error) : url.href;
+};
+
 const main = async () => {
   const { root: rootArg, command, flags } = parseArgs(process.argv);
   const root = resolveRoot(rootArg);
@@ -94,77 +118,85 @@ const main = async () => {
     fail(`找不到環境目錄：${path.dirname(envPath)}`);
   }
   loadDotEnv(envPath, { override: true });
+  const responseFile = typeof flags.file === "string" ? path.resolve(flags.file) : "";
+  process.chdir(root);
 
   if (command === "status") {
     const cfg = getConfig();
     emit({
       ok: true,
+      ...toLicenseSummary(await getLicenseState()),
       listenPort: cfg.kiosk.listenPort,
       adminIps: cfg.kiosk.adminIps,
-      allowPublicBooking: envFlagTrue("KIOSK_ALLOW_PUBLIC_BOOKING"),
+      publicBookingUrl: process.env.KIOSK_PUBLIC_BOOKING_URL?.trim() ?? "",
     });
     return;
   }
 
   if (command === "save-service") {
-    const adminIps = String(flags["admin-ips"] ?? flags.adminIps ?? "").trim();
+    const adminIps = parseAdminIps(String(flags["admin-ips"] ?? flags.adminIps ?? "")).join(",");
     const portFlag = String(flags.port ?? "").trim();
     const listenPort = portFlag
       ? parseListenPort(portFlag)
       : getKioskListenPort();
-    const allowPublic =
-      flags["allow-public"] === true ||
-      flags["allow-public"] === "1" ||
-      flags["allow-public"] === "true" ||
-      flags.allowPublic === true ||
-      flags.allowPublic === "1" ||
-      flags.allowPublic === "true";
+    const publicBookingUrl = flags["public-booking-url"] === undefined
+      ? undefined
+      : parsePublicBookingUrl(flags["public-booking-url"]);
 
-    if (!existsSync(envPath)) writeUtf8(envPath, "");
-    upsertEnvLine(envPath, "KIOSK_ADMIN_IPS", adminIps);
-    upsertEnvLine(envPath, "PORT", String(listenPort));
-    upsertEnvLine(envPath, "HOSTNAME", process.env.HOSTNAME || "0.0.0.0");
-    upsertEnvLine(
-      envPath,
-      "KIOSK_ALLOW_PUBLIC_BOOKING",
-      allowPublic ? "1" : "0",
-    );
-    // 清掉舊版殘留鍵（YSCP／授權）
-    for (const key of [
-      "YSCP_HOST",
-      "YSCP_AK",
-      "YSCP_SK",
-      "YSCP_EVENT_DEST",
-      "YSCP_EVENT_TOKEN",
-      "YSCP_EXIT_LANES",
-      "YSCP_SOURCE_IP",
-      "YSCP_TLS_INSECURE",
-      "YSCP_EXIT_GATE_MINUTES",
-      "LICENSE_PLATFORM_API_BASE_URL",
-      "LICENSE_SIGN_SECRET",
-      "LICENSE_OPEN_ALL_FEATURES",
-      "LICENSE_PLATFORM_TIMEOUT_MS",
-    ]) {
-      removeEnvLine(envPath, key);
-    }
+    updateEnvFile(envPath, {
+      KIOSK_ADMIN_IPS: adminIps,
+      PORT: String(listenPort),
+      HOSTNAME: process.env.HOSTNAME || "0.0.0.0",
+      ...(publicBookingUrl === undefined ? {} : { KIOSK_PUBLIC_BOOKING_URL: publicBookingUrl || null }),
+      KIOSK_ALLOW_PUBLIC_BOOKING: null,
+      YSCP_HOST: null,
+      YSCP_AK: null,
+      YSCP_SK: null,
+      YSCP_EVENT_DEST: null,
+      YSCP_EVENT_TOKEN: null,
+      YSCP_EXIT_LANES: null,
+      YSCP_SOURCE_IP: null,
+      YSCP_TLS_INSECURE: null,
+      YSCP_EXIT_GATE_MINUTES: null,
+    });
     emit({
       ok: true,
       envPath,
       listenPort,
       adminIps,
-      allowPublicBooking: allowPublic,
+      publicBookingUrl: publicBookingUrl ?? process.env.KIOSK_PUBLIC_BOOKING_URL?.trim() ?? "",
     });
     return;
   }
 
-  fail(`未知命令: ${command}`);
-};
+  if (command === "license-activate" || command === "license-offline-request") {
+    const key = flags.key ?? flags.licenseKey;
+    if (typeof key !== "string" || !key.trim()) {
+      return fail("請提供 --key <License Key>");
+    }
+    if (command === "license-activate") {
+      emit({ ok: true, ...toLicenseSummary(await activateLicenseByKey(key)) });
+    } else {
+      emit({ ok: true, requestFileBase64: buildOfflineRequestBase64(key) });
+    }
+    return;
+  }
 
-const envFlagTrue = (key: string): boolean => {
-  const v = String(process.env[key] ?? "")
-    .trim()
-    .toLowerCase();
-  return v === "1" || v === "true" || v === "yes";
+  if (command === "license-offline-import") {
+    const rawJson = typeof flags.json === "string" ? flags.json : "";
+    if (!responseFile && !rawJson) return fail("請提供 --file <回應檔> 或 --json <payload>");
+    const raw = responseFile ? readUtf8(responseFile) : rawJson;
+    let payload: unknown;
+    try {
+      payload = JSON.parse(raw.replace(/^\uFEFF/, ""));
+    } catch {
+      return fail("離線授權檔不是有效 JSON");
+    }
+    emit({ ok: true, ...toLicenseSummary(await importOfflineLicensePayload(payload)) });
+    return;
+  }
+
+  fail(`未知命令: ${command}`);
 };
 
 main().catch((error) => {

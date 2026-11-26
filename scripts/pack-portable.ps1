@@ -155,7 +155,7 @@ Copy-Item (Join-Path $StandaloneDir "*") $AppRoot -Recurse -Force
 $dataPath = Join-Path $AppRoot "data"
 if (Test-Path $dataPath) { Remove-Item $dataPath -Recurse -Force }
 New-Item -ItemType Directory -Path $dataPath -Force | Out-Null
-# 注意：Inno 升級不安裝 app\data\*（保留現場設定／紀錄）；此空目錄僅供中繼結構
+# 注意：Inno 升級不安裝 app\data\*（保留現場授權／設定／紀錄）；此空目錄僅供中繼結構
 
 # 清掉 standalone／建置機可能帶入的完整 env；寫入「首次安裝」樣板
 # 升級時 Inno 以 onlyifdoesntexist 保留現場 app\.env（對齊 YSOP／BA）
@@ -164,30 +164,13 @@ foreach ($junk in @(".env", ".env.local", ".env.development", ".env.production",
   if (Test-Path $p) { Remove-Item $p -Force }
 }
 
-function Get-DotEnvValue([string]$EnvFile, [string]$Key) {
-  if (-not (Test-Path -LiteralPath $EnvFile)) { return "" }
-  foreach ($line in Get-Content -LiteralPath $EnvFile -Encoding UTF8) {
-    $t = $line.Trim()
-    if (-not $t -or $t.StartsWith("#")) { continue }
-    $eq = $t.IndexOf("=")
-    if ($eq -le 0) { continue }
-    if ($t.Substring(0, $eq).Trim() -ne $Key) { continue }
-    $v = $t.Substring($eq + 1).Trim()
-    if (($v.StartsWith('"') -and $v.EndsWith('"')) -or ($v.StartsWith("'") -and $v.EndsWith("'"))) {
-      $v = $v.Substring(1, $v.Length - 2)
-    }
-    return $v
-  }
-  return ""
-}
-
 $FreshEnv = @"
-# YSOP Kiosk portable — 服務設定請用 YsopKiosk.exe → 服務設定
+# YSOP Kiosk portable — 授權與服務設定請用 YsopKiosk.exe
 # SMTP／MAIL_FROM 請現場手動補齊（預約雙通道寄信）
+# LICENSE_SIGN_SECRET 由授權平台提供，離線匯入前請設定。
 PORT=3010
 HOSTNAME=0.0.0.0
 KIOSK_ADMIN_IPS=
-KIOSK_ALLOW_PUBLIC_BOOKING=0
 "@
 $FreshEnvPath = Join-Path $AppRoot ".env"
 [System.IO.File]::WriteAllText($FreshEnvPath, $FreshEnv.TrimStart() + "`n", [System.Text.UTF8Encoding]::new($false))

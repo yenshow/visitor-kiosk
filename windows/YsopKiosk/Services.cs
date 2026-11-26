@@ -114,6 +114,7 @@ internal static class YscpBridgeClient
         psi.ArgumentList.Add("--root");
         psi.ArgumentList.Add(root);
         foreach (var a in args) psi.ArgumentList.Add(a);
+        psi.Environment["NODE_ENV"] = "production";
 
         using var proc = Process.Start(psi) ?? throw new InvalidOperationException("無法啟動 node bridge");
         var stdout = await proc.StandardOutput.ReadToEndAsync();
@@ -173,6 +174,10 @@ internal sealed class KioskProcessService
 
     internal async Task StartAsync()
     {
+        var license = await YscpBridgeClient.RunAsync(_root, "status");
+        if (!license.Ok || !license.GetBool("licensed"))
+            throw new InvalidOperationException("請先於授權設定確認產品授權。");
+
         if (await IsRunningAsync()) return;
 
         var node = Path.Combine(_root, "node", "node.exe");

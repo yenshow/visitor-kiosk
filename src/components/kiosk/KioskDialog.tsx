@@ -8,6 +8,7 @@ type KioskDialogProps = {
   title: string;
   closeLabel: string;
   maxWidthClass?: string;
+  maxHeightClass?: string;
   children: ReactNode;
 };
 
@@ -17,6 +18,7 @@ export const KioskDialog = ({
   title,
   closeLabel,
   maxWidthClass = "max-w-5xl",
+  maxHeightClass = "max-h-[92vh]",
   children,
 }: KioskDialogProps) => {
   const titleId = useId();
@@ -42,7 +44,7 @@ export const KioskDialog = ({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className={`flex max-h-[92vh] w-full ${maxWidthClass} flex-col rounded-2xl bg-white shadow-2xl`}
+        className={`flex w-full ${maxWidthClass} ${maxHeightClass} flex-col rounded-2xl bg-white shadow-2xl`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 px-6 py-4">

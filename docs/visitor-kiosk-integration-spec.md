@@ -1,6 +1,6 @@
 # YSOP Kiosk 獨立訪客機規格
 
-獨立訪客機（**YSOP Kiosk**）本機完成預約／報到／簽退。前端只打 `/api/kiosk/*`。本期**不控門禁、不開閘**。無產品授權／訂閱閘道。
+獨立訪客機（**YSOP Kiosk**）本機完成預約／報到／簽退。前端呼叫 `/api/kiosk/*`，其中預約與報到需啟用 `visitor` 產品授權。
 
 時區 `Asia/Taipei`。
 
@@ -18,7 +18,7 @@
 
 首頁：**訪客報到**、**訪客簽退**、可關閉的**現場訪客預約**；統計「目前在場／臨時外出／今日離場」**僅顯示數字，不開啟明細**（訪客紀錄在設定頁，與重置並排；可篩「全部／逾期在場／所有離場」；**逾期在場不顯示於首頁統計列**）。預約**自動核准**，成功畫面顯示預約碼。
 
-**外部預約：** 公開頁 `/book`（`publicBookingEnabled` 可關）。可約**今日起最長 30 日**內（同日開始／結束）。服務設定勾選「允許外部預約入站」後防火牆開放；正式環境建議反向代理＋HTTPS。設定頁仍僅本機／管理員 IP。
+**外部預約：** 預約頁 `/book` 由 `publicBookingEnabled` 控制。可約**今日起最長 30 日**內（同日開始／結束）。對外部署可使用 HTTPS 反向代理。服務設定可保存供分享的網址。
 
 **查詢（單一輸入框）：** 8～15 碼純數字視為手機（整號比對，共乘可多人）；其餘視為 **4 碼**預約碼（僅精準比對 `appointCode` 或 `appointID`）。預約碼查在場只鎖 `visitorId`，不以同手機帶出他人。逾期不自動簽退。
 
@@ -80,7 +80,7 @@ SMTP 未設、名單空、或寄信失敗只 log，**不擋預約**。
 
 前端只呼叫下列路由。成功 `{ "code": "0", "msg": "Success", "data": ... }`；失敗 `code` 為 HTTP 狀態字串，`data` 為 `null`。
 
-**存取：** `PUT settings`、`POST logo`、`GET records`、`POST records/reset`、`GET/POST directory`、頁面 `/setting` → 須本機或管理員 IP。其餘訪客流程、`/book`、`GET settings`／`GET logo` 公開（是否可從外網連入取決於防火牆／`KIOSK_ALLOW_PUBLIC_BOOKING`）。
+**存取：** `PUT settings`、`POST logo`、`GET records`、`POST records/reset`、`GET/POST directory`、頁面 `/setting` 須本機或管理員 IP。公開代理只轉送外部預約需要的路徑與方法，見[安裝與環境設定](./env-setup.md#2-現場安裝)。
 
 | 方法 | 路徑 | 用途 |
 |------|------|------|

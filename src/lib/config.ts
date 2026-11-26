@@ -1,3 +1,5 @@
+import { LICENSE_PLATFORM_API_DEFAULT } from "@/lib/license/constants";
+
 export const KIOSK_LISTEN_PORT_DEFAULT = 3010;
 
 export const getKioskListenPort = (): number => {
@@ -27,6 +29,12 @@ export type AppConfig = {
     adminIps: string;
   };
   smtp: SmtpConfig;
+  license: {
+    platformApiBaseUrl: string;
+    platformTimeoutMs: number;
+    signSecret: string;
+    openAllFeatures: boolean;
+  };
 };
 
 const parsePositiveInt = (raw: string, fallback: number): number => {
@@ -52,6 +60,15 @@ export const getConfig = (): AppConfig => {
       pass: smtpPass,
       from: smtpFrom,
       configured: Boolean(smtpUser && smtpPass),
+    },
+    license: {
+      platformApiBaseUrl:
+        env("LICENSE_PLATFORM_API_BASE_URL") || LICENSE_PLATFORM_API_DEFAULT,
+      platformTimeoutMs: parsePositiveInt(env("LICENSE_PLATFORM_TIMEOUT_MS"), 10_000),
+      signSecret: env("LICENSE_SIGN_SECRET"),
+      openAllFeatures:
+        process.env.NODE_ENV !== "production" &&
+        ["1", "true", "yes"].includes(env("LICENSE_OPEN_ALL_FEATURES").toLowerCase()),
     },
   };
 };

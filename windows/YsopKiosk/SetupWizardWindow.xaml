@@ -15,7 +15,7 @@
                Foreground="{StaticResource TextPrimaryBrush}"/>
     <TextBlock FontSize="13" Margin="0,3,0,14"
                Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"
-               Text="設定服務埠、管理員 IP，以及是否開放外部預約入站。"/>
+               Text="設定服務埠、管理員 IP 與外部預約。"/>
 
     <Border Padding="14,12"
             Background="{StaticResource CardBackgroundBrush}"
@@ -24,14 +24,13 @@
       <StackPanel>
         <TextBlock Style="{StaticResource SectionHeader}" Text="服務埠與來源限制"/>
         <TextBlock Style="{StaticResource FormHint}" Margin="0,0,0,8"
-                   Text="未勾選外部預約時，防火牆僅放行本機與管理員 IP。勾選後開放入站，設定頁仍僅管理員 IP 可開。"/>
+                   Text="程式建立的服務埠入站規則僅允許本機與管理員 IP。"/>
         <Grid>
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="110"/>
             <ColumnDefinition Width="*"/>
           </Grid.ColumnDefinitions>
           <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
           </Grid.RowDefinitions>
@@ -47,12 +46,29 @@
                    AcceptsReturn="True" TextWrapping="Wrap"
                    VerticalScrollBarVisibility="Auto"
                    ToolTip="瀏覽器連線端的 IP（非本機訪客機 IP）；可多行或逗號；空白則僅本機可開設定頁"/>
-          <CheckBox Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2"
-                    x:Name="ChkAllowPublic"
-                    Margin="0,4,0,0"
-                    Content="允許外部預約入站（開放防火牆；建議另以反向代理＋HTTPS）"
-                    FontSize="13"/>
         </Grid>
+      </StackPanel>
+    </Border>
+
+    <Border Margin="0,12,0,0" Padding="14,12"
+            Background="{StaticResource CardBackgroundBrush}"
+            BorderBrush="{StaticResource CardBorderBrush}"
+            BorderThickness="1" CornerRadius="10">
+      <StackPanel>
+        <TextBlock x:Name="PublicBookingUrlLabel" Style="{StaticResource SectionHeader}"
+                   Text="外部預約網址"/>
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="Auto"/>
+          </Grid.ColumnDefinitions>
+          <TextBox x:Name="TxtPublicBookingUrl" Style="{StaticResource ThemedTextBox}"
+                   AutomationProperties.LabeledBy="{Binding ElementName=PublicBookingUrlLabel}"/>
+          <Button Grid.Column="1" Content="複製網址" Margin="8,0,0,0"
+                  Click="OnCopyPublicBookingUrl"/>
+        </Grid>
+        <TextBlock Style="{StaticResource FormHint}" Margin="0,6,0,0"
+                   Text="選填。填入已可對外連線的網址供訪客使用，例如 https://visit.example.com/book。反向代理請另行設定。"/>
       </StackPanel>
     </Border>
 

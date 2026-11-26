@@ -7,6 +7,7 @@ import {
   deleteHost,
   deleteOrg,
   getDirectory,
+  updateHostEmail,
 } from "@/lib/kiosk/directory";
 
 export const GET = async (request: Request) => {
@@ -29,6 +30,7 @@ type DirectoryBody = {
   orgName?: string;
   personId?: string;
   personName?: string;
+  email?: string;
 };
 
 export const POST = async (request: Request) => {
@@ -47,7 +49,13 @@ export const POST = async (request: Request) => {
       await createHost({
         orgIndexCode: String(body.orgIndexCode ?? ""),
         personName: String(body.personName ?? ""),
+        email: String(body.email ?? ""),
       });
+    } else if (action === "updateHostEmail") {
+      await updateHostEmail(
+        String(body.personId ?? ""),
+        String(body.email ?? ""),
+      );
     } else if (action === "deleteHost") {
       await deleteHost(String(body.personId ?? ""));
     } else {

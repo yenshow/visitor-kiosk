@@ -41,6 +41,7 @@ export default function HomePage() {
   const [screen, setScreen] = useState<Screen>("home");
   const [stats, setStats] = useState<KioskStatsView | null>(null);
   const [settings, setSettings] = useState<KioskSettingsView | null>(null);
+  const [licensed, setLicensed] = useState<boolean | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -59,6 +60,25 @@ export default function HomePage() {
     void load();
     return () => {
       cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const loadStatus = async () => {
+      try {
+        const res = await fetch("/api/kiosk/status", { signal: controller.signal, cache: "no-store" });
+        const result = (await res.json()) as { data?: { licensed?: boolean } };
+        if (!controller.signal.aborted) setLicensed(result.data?.licensed === true);
+      } catch {
+        if (!controller.signal.aborted) setLicensed(false);
+      }
+    };
+    void loadStatus();
+    const timer = window.setInterval(() => void loadStatus(), STATS_POLL_MS);
+    return () => {
+      controller.abort();
+      window.clearInterval(timer);
     };
   }, []);
 
@@ -93,6 +113,7 @@ export default function HomePage() {
     <>
       <ThemeSync theme={settings?.theme} />
       <KioskShell
+        licensed={licensed !== false}
         layout={screen === "home" ? "home" : "flow"}
         marquee={settings?.resolvedMarquee || DEFAULT_MARQUEE}
         logoUrl={settings?.logoUrl || "/yenshow-logo.svg"}
@@ -101,6 +122,7 @@ export default function HomePage() {
           <HomeActionCards
             stats={stats}
             showAppoint={showAppoint}
+            licensed={licensed === true}
             onCheckin={() => setScreen("checkin")}
             onCheckout={() => setScreen("checkout")}
             onAppoint={() => setScreen("appoint")}

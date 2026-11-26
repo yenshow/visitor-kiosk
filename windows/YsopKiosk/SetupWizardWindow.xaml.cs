@@ -38,7 +38,7 @@ public partial class SetupWizardWindow : Window
             TxtListenPort.Text = port.ToString();
         }
         TxtAdminIps.Text = st.GetString("adminIps") ?? "";
-        ChkAllowPublic.IsChecked = st.GetBool("allowPublicBooking");
+        TxtPublicBookingUrl.Text = st.GetString("publicBookingUrl");
     }
 
     private async Task<bool> SaveServiceAsync()
@@ -49,7 +49,6 @@ public partial class SetupWizardWindow : Window
             return false;
         }
         _listenPort = port;
-        var allowPublic = ChkAllowPublic.IsChecked == true;
         var save = await YscpBridgeClient.RunAsync(
             _root,
             "save-service",
@@ -57,8 +56,8 @@ public partial class SetupWizardWindow : Window
             port.ToString(),
             "--admin-ips",
             TxtAdminIps.Text,
-            "--allow-public",
-            allowPublic ? "1" : "0");
+            "--public-booking-url",
+            TxtPublicBookingUrl.Text.Trim());
         if (save.Ok) return true;
         MessageBox.Show(save.Error ?? "儲存失敗", "服務設定",
             MessageBoxButton.OK, MessageBoxImage.Error);
@@ -72,18 +71,16 @@ public partial class SetupWizardWindow : Window
         {
             if (!await SaveServiceAsync()) return;
 
-            var allowPublic = ChkAllowPublic.IsChecked == true;
             var (fwOk, fwMsg) = FirewallHelper.ApplyInboundAllow(
                 _listenPort,
-                TxtAdminIps.Text,
-                allowPublic);
+                TxtAdminIps.Text);
 
             Applied = true;
-            var msg = "服務設定已套用。將重啟訪客機服務。";
+            var msg = "服務設定已套用。";
             if (fwOk)
                 msg += $"\n{fwMsg}";
             else
-                msg += $"\n\n注意：防火牆未更新 — {fwMsg}\n請重新套用並在 UAC 按「是」，或以系統管理員手動放行入站 TCP {_listenPort}。";
+                msg += $"\n\n防火牆規則尚未更新：{fwMsg}\n請重新套用並在 UAC 按「是」。";
 
             MessageBox.Show(
                 msg,
@@ -107,5 +104,26 @@ public partial class SetupWizardWindow : Window
     {
         DialogResult = false;
         Close();
+    }
+
+    private void OnCopyPublicBookingUrl(object sender, RoutedEventArgs e)
+    {
+        var url = TxtPublicBookingUrl.Text.Trim();
+        if (url.Length == 0)
+        {
+            TxtPublicBookingUrl.Focus();
+            return;
+        }
+
+        try
+        {
+            Clipboard.SetText(url);
+            MessageBox.Show(this, "已複製外部預約網址。", Title);
+        }
+        catch (System.Runtime.InteropServices.ExternalException)
+        {
+            MessageBox.Show(this, "無法存取剪貼簿，請稍後再試。", Title,
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
     }
 }

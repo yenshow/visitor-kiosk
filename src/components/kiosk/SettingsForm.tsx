@@ -43,6 +43,24 @@ const BTN_DANGER = `${BTN} bg-red-600 text-white active:bg-red-700`;
 const HINT = "text-sm font-normal text-slate-500";
 const LABEL_ROW = "mb-2 flex flex-wrap items-baseline gap-x-2 gap-y-0.5";
 
+const THEME_OPTIONS = [
+  {
+    value: "light",
+    label: "明亮",
+    icon: (
+      <>
+        <circle cx="12" cy="12" r="4" />
+        <path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5" />
+      </>
+    ),
+  },
+  {
+    value: "dark",
+    label: "黑暗",
+    icon: <path d="M21 14.5A8.5 8.5 0 1 1 9.5 3 7 7 0 0 0 21 14.5z" />,
+  },
+] as const;
+
 const Icon = ({
   children,
   className = "size-6",
@@ -224,15 +242,15 @@ export const SettingsForm = ({ initial, onSaved }: SettingsFormProps) => {
           <span className={LABEL}>公司 Logo</span>
           <span className={HINT}>支援 PNG／JPG／SVG／WebP，上限 2MB</span>
         </div>
-        <div className="flex flex-wrap items-center gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+        <div className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
           {/* 動態自訂 Logo URL，不適合 next/image 靜態優化 */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={logoUrl}
             alt="公司 Logo 預覽"
-            className="h-16 w-auto max-w-55 object-contain"
+            className="h-16 w-auto max-w-40 shrink-0 object-contain"
           />
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             <button
               type="button"
               className={BTN_DARK}
@@ -308,35 +326,35 @@ export const SettingsForm = ({ initial, onSaved }: SettingsFormProps) => {
 
       <div>
         <span className={`mb-2 block ${LABEL}`}>顯示模式</span>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-[minmax(0,1.6fr)_minmax(0,1.6fr)_minmax(0,2fr)]">
           <button
             type="button"
             role="switch"
             aria-checked={showAppoint}
-            aria-label="現場訪客預約功能"
-            className={`flex min-h-16 cursor-pointer items-center justify-between gap-3 rounded-xl border px-4 text-left text-base font-semibold active:scale-[0.99] ${
+            aria-label="訪客預約"
+            className={`flex min-h-16 cursor-pointer items-center justify-between gap-2 rounded-xl border px-2 text-left text-sm font-semibold active:scale-[0.99] sm:px-3 sm:text-base ${
               showAppoint
                 ? "border-blue-600 bg-blue-50 text-blue-900"
                 : "border-slate-300 bg-white text-slate-800"
             }`}
             onClick={() => setShowAppoint((prev) => !prev)}
           >
-            <span className="flex min-w-0 items-center gap-3">
-              <Icon className="size-7 shrink-0">
+            <span className="flex min-w-0 items-center gap-2">
+              <Icon className="hidden size-6 shrink-0 min-[420px]:block">
                 <rect x="3" y="4" width="18" height="18" rx="2" />
                 <path d="M16 2v4M8 2v4M3 10h18" />
               </Icon>
-              <span className="leading-snug">現場預約</span>
+              <span className="leading-snug">訪客預約</span>
             </span>
             <span
-              className={`relative h-8 w-14 shrink-0 rounded-full transition-colors ${
+              className={`relative h-6 w-9 shrink-0 rounded-full transition-colors ${
                 showAppoint ? "bg-blue-600" : "bg-slate-300"
               }`}
               aria-hidden
             >
               <span
-                className={`absolute top-1 size-6 rounded-full bg-white shadow transition-transform ${
-                  showAppoint ? "left-7" : "left-1"
+                className={`absolute top-1 left-0 size-4 rounded-full bg-white shadow transition-transform ${
+                  showAppoint ? "translate-x-4" : "translate-x-1"
                 }`}
               />
             </span>
@@ -346,82 +364,65 @@ export const SettingsForm = ({ initial, onSaved }: SettingsFormProps) => {
             type="button"
             role="switch"
             aria-checked={publicBookingEnabled}
-            aria-label="外部線上預約功能"
-            className={`flex min-h-16 cursor-pointer items-center justify-between gap-3 rounded-xl border px-4 text-left text-base font-semibold active:scale-[0.99] ${
+            aria-label="外部預約"
+            className={`flex min-h-16 cursor-pointer items-center justify-between gap-2 rounded-xl border px-2 text-left text-sm font-semibold active:scale-[0.99] sm:px-3 sm:text-base ${
               publicBookingEnabled
                 ? "border-blue-600 bg-blue-50 text-blue-900"
                 : "border-slate-300 bg-white text-slate-800"
             }`}
             onClick={() => setPublicBookingEnabled((prev) => !prev)}
           >
-            <span className="flex min-w-0 items-center gap-3">
-              <Icon className="size-7 shrink-0">
+            <span className="flex min-w-0 items-center gap-2">
+              <Icon className="hidden size-6 shrink-0 min-[420px]:block">
                 <circle cx="12" cy="12" r="9" />
                 <path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" />
               </Icon>
               <span className="leading-snug">外部預約</span>
             </span>
             <span
-              className={`relative h-8 w-14 shrink-0 rounded-full transition-colors ${
+              className={`relative h-6 w-9 shrink-0 rounded-full transition-colors ${
                 publicBookingEnabled ? "bg-blue-600" : "bg-slate-300"
               }`}
               aria-hidden
             >
               <span
-                className={`absolute top-1 size-6 rounded-full bg-white shadow transition-transform ${
-                  publicBookingEnabled ? "left-7" : "left-1"
+                className={`absolute top-1 left-0 size-4 rounded-full bg-white shadow transition-transform ${
+                  publicBookingEnabled ? "translate-x-4" : "translate-x-1"
                 }`}
               />
             </span>
           </button>
 
-          <button
-            type="button"
-            role="switch"
-            aria-checked={theme === "dark"}
-            aria-label="黑暗模式"
-            className={`flex min-h-16 cursor-pointer items-center justify-between gap-3 rounded-xl border px-4 text-left text-base font-semibold active:scale-[0.99] ${
-              theme === "dark"
-                ? "border-blue-600 bg-blue-50 text-blue-900"
-                : "border-slate-300 bg-white text-slate-800"
-            }`}
-            onClick={() =>
-              handleThemeChange(theme === "dark" ? "light" : "dark")
-            }
-          >
-            <span className="flex min-w-0 items-center gap-3">
-              <Icon className="size-7 shrink-0">
-                <path d="M21 14.5A8.5 8.5 0 1 1 9.5 3 7 7 0 0 0 21 14.5z" />
-              </Icon>
-              <span className="leading-snug">黑暗模式</span>
-            </span>
-            <span
-              className={`relative h-8 w-14 shrink-0 rounded-full transition-colors ${
-                theme === "dark" ? "bg-blue-600" : "bg-slate-300"
-              }`}
-              aria-hidden
-            >
-              <span
-                className={`absolute top-1 size-6 rounded-full bg-white shadow transition-transform ${
-                  theme === "dark" ? "left-7" : "left-1"
-                }`}
-              />
-            </span>
-          </button>
+          <div role="group" aria-label="色彩主題" className="col-span-2 grid grid-cols-2 gap-2 md:col-span-1">
+            {THEME_OPTIONS.map(({ value, label, icon }) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={theme === value}
+                className="flex min-h-16 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border border-slate-300 bg-white px-3 py-1 text-base leading-tight font-semibold text-slate-800 hover:border-blue-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 aria-pressed:border-blue-600 aria-pressed:bg-blue-600 aria-pressed:text-white"
+                onClick={() => handleThemeChange(value)}
+              >
+                <Icon>{icon}</Icon>
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
       <label className="block">
         <span className={LABEL_ROW}>
-          <span className={LABEL}>預約通知信箱</span>
-          <span className={HINT}>固定內部信箱；換行或逗號分隔，上限 20</span>
+          <span className={LABEL}>總機固定通知</span>
+          <span className={HINT}>
+            每次預約都會寄（與被訪人信箱合併去重）；換行或逗號分隔，上限 20
+          </span>
         </span>
         <textarea
           className={`${FIELD} min-h-24 px-4 py-3 text-lg`}
           value={approverEmailsText}
           onChange={(e) => setApproverEmailsText(e.target.value)}
           placeholder={"reception@example.com"}
-          aria-label="預約通知信箱"
+          aria-label="總機固定通知"
         />
       </label>
 

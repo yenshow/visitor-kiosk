@@ -96,7 +96,6 @@ export const AppointForm = ({
           source: variant,
           receptionistId: selectedHost.personId,
           receptionistName: selectedHost.personName,
-          orgLabel: selectedHost.orgName?.trim() || "",
           appointStartTime: toTaipeiIsoFromDateAndTime(dateKey, startAt),
           appointEndTime: toTaipeiIsoFromDateAndTime(dateKey, endAt),
           visitReasonType: reasonType,

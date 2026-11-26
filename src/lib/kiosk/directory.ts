@@ -2,6 +2,8 @@ import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
 import type { HostPerson, OrgOption } from "@/lib/kiosk/visitor";
+import { getSettings } from "@/lib/kiosk/settings";
+import { isValidEmail } from "@/lib/kiosk/visitor-fields";
 
 export type DirectoryOrg = {
   orgIndexCode: string;
@@ -12,6 +14,8 @@ export type DirectoryHost = {
   personId: string;
   personName: string;
   orgIndexCode: string;
+  /** 被訪人通知信箱（選填） */
+  email: string;
 };
 
 export type DirectoryStore = {
@@ -35,6 +39,13 @@ const writeStore = async (store: DirectoryStore): Promise<void> => {
 
 const cleanName = (value: unknown): string => String(value ?? "").trim();
 
+const normalizeHostEmail = (raw: unknown): string => {
+  const email = cleanName(raw);
+  if (!email) return "";
+  if (!isValidEmail(email)) throw new Error("Email 格式不正確");
+  return email;
+};
+
 const readStore = async (): Promise<DirectoryStore> => {
   try {
     const raw = await readFile(STORE_PATH, "utf8");
@@ -49,12 +60,18 @@ const readStore = async (): Promise<DirectoryStore> => {
       : [];
     const hosts = Array.isArray(parsed.hosts)
       ? parsed.hosts
-          .map((host) => ({
-            personId: cleanName(host.personId),
-            personName: cleanName(host.personName),
-            orgIndexCode: cleanName(host.orgIndexCode),
-          }))
-          .filter((host) => host.personId && host.personName && host.orgIndexCode)
+          .map((host) => {
+            const emailRaw = cleanName((host as { email?: unknown }).email);
+            return {
+              personId: cleanName(host.personId),
+              personName: cleanName(host.personName),
+              orgIndexCode: cleanName(host.orgIndexCode),
+              email: emailRaw && isValidEmail(emailRaw) ? emailRaw : "",
+            };
+          })
+          .filter(
+            (host) => host.personId && host.personName && host.orgIndexCode,
+          )
       : [];
     return { orgs, hosts };
   } catch {
@@ -96,6 +113,44 @@ export const getHost = async (
   return hosts.find((host) => host.personId === id) ?? null;
 };
 
+/**
+ * 依被訪人解析內部通知：被訪人信箱 + 總機固定 CC（去重）。
+ * 同時回傳目錄部門名供郵件正文使用。
+ */
+export const resolveNotifyEmails = async (
+  personId: string,
+): Promise<{ emails: string[]; orgName: string; hostName: string }> => {
+  const id = cleanName(personId);
+  if (!id) throw new Error("找不到被訪人，請至設定頁確認人員目錄");
+
+  const store = await readStore();
+  const host = store.hosts.find((item) => item.personId === id);
+  if (!host) throw new Error("找不到被訪人，請至設定頁確認人員目錄");
+
+  const org = store.orgs.find((item) => item.orgIndexCode === host.orgIndexCode);
+  const { approverEmails } = await getSettings();
+
+  const seen = new Set<string>();
+  const emails: string[] = [];
+  const push = (value: string) => {
+    const email = value.trim();
+    if (!email) return;
+    const key = email.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    emails.push(email);
+  };
+
+  push(host.email);
+  for (const email of approverEmails) push(email);
+
+  return {
+    emails,
+    orgName: org?.orgName ?? "",
+    hostName: host.personName,
+  };
+};
+
 export const createOrg = async (orgName: string): Promise<DirectoryOrg> => {
   const name = cleanName(orgName);
   if (!name) throw new Error("請填寫部門名稱");
@@ -127,9 +182,11 @@ export const deleteOrg = async (orgIndexCode: string): Promise<void> => {
 export const createHost = async (input: {
   orgIndexCode: string;
   personName: string;
+  email?: string;
 }): Promise<DirectoryHost> => {
   const orgIndexCode = cleanName(input.orgIndexCode);
   const personName = cleanName(input.personName);
+  const email = normalizeHostEmail(input.email);
   if (!orgIndexCode) throw new Error("請先選擇部門");
   if (!personName) throw new Error("請填寫被訪人姓名");
   const store = await readStore();
@@ -148,9 +205,28 @@ export const createHost = async (input: {
     personId: randomUUID(),
     personName,
     orgIndexCode,
+    email,
   };
   await writeStore({ ...store, hosts: [...store.hosts, host] });
   return host;
+};
+
+export const updateHostEmail = async (
+  personId: string,
+  emailRaw: string,
+): Promise<DirectoryHost> => {
+  const id = cleanName(personId);
+  if (!id) throw new Error("缺少被訪人");
+  const email = normalizeHostEmail(emailRaw);
+  const store = await readStore();
+  const index = store.hosts.findIndex((host) => host.personId === id);
+  if (index < 0) throw new Error("找不到被訪人");
+
+  const next: DirectoryHost = { ...store.hosts[index], email };
+  const hosts = [...store.hosts];
+  hosts[index] = next;
+  await writeStore({ ...store, hosts });
+  return next;
 };
 
 export const deleteHost = async (personId: string): Promise<void> => {

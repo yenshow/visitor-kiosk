@@ -18,11 +18,11 @@ import {
 import { getSettings } from "@/lib/kiosk/settings";
 import { PUBLIC_BOOKING_MAX_DAYS } from "@/lib/kiosk/ui-constants";
 import { isValidEmail } from "@/lib/kiosk/visitor-fields";
+import { requireVisitorLicense } from "@/lib/license/gate";
 
 type AppointBody = {
   receptionistId?: string;
   receptionistName?: string;
-  orgLabel?: string;
   appointStartTime?: string;
   appointEndTime?: string;
   visitReasonType?: number;
@@ -46,6 +46,9 @@ export const POST = async (request: Request) => {
   );
   if (!limited.ok) return rateLimitResponse(limited.retryAfterSec);
 
+  const denied = await requireVisitorLicense();
+  if (denied) return denied;
+
   try {
     const body = (await request.json()) as AppointBody;
     const source: "kiosk" | "public" =
@@ -60,7 +63,6 @@ export const POST = async (request: Request) => {
 
     const receptionistId = String(body.receptionistId ?? "").trim();
     const receptionistName = String(body.receptionistName ?? "").trim();
-    const orgLabel = String(body.orgLabel ?? "").trim();
     const visitorFamilyName = String(body.visitorFamilyName ?? "").trim();
     const visitorGivenName = String(body.visitorGivenName ?? "").trim();
     const appointStartTime = String(body.appointStartTime ?? "").trim();
@@ -144,8 +146,8 @@ export const POST = async (request: Request) => {
       visitReasonType,
       appointStartTime,
       appointEndTime,
+      receptionistId: item.receptionistId ?? receptionistId,
       receptionistName: item.receptionistName ?? receptionistName,
-      orgLabel,
       appointCode,
       source,
     });

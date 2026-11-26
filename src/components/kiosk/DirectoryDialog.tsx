@@ -12,6 +12,7 @@ type DirectoryHost = {
   personId: string;
   personName: string;
   orgIndexCode: string;
+  email?: string;
 };
 
 type DirectoryStore = {
@@ -22,6 +23,11 @@ type DirectoryStore = {
 type PendingDelete =
   | { kind: "org"; orgIndexCode: string; orgName: string }
   | { kind: "host"; personId: string; personName: string };
+
+type HostDraft = {
+  personName: string;
+  email: string;
+};
 
 type DirectoryDialogProps = {
   open: boolean;
@@ -36,11 +42,14 @@ const BTN_DARK = `${BTN} bg-slate-800 text-white active:bg-slate-700`;
 const BTN_OUTLINE = `${BTN} border border-slate-300 bg-white text-slate-700 active:bg-slate-100`;
 const BTN_DANGER = `${BTN} border border-red-200 bg-white text-red-700 active:bg-red-50`;
 
+const emptyHostDraft = (): HostDraft => ({ personName: "", email: "" });
+
 const DirectoryPanel = () => {
   const [orgs, setOrgs] = useState<DirectoryOrg[]>([]);
   const [hosts, setHosts] = useState<DirectoryHost[]>([]);
   const [orgName, setOrgName] = useState("");
-  const [hostDrafts, setHostDrafts] = useState<Record<string, string>>({});
+  const [hostDrafts, setHostDrafts] = useState<Record<string, HostDraft>>({});
+  const [emailDrafts, setEmailDrafts] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -53,6 +62,11 @@ const DirectoryPanel = () => {
   const applyStore = (store: DirectoryStore) => {
     setOrgs(store.orgs);
     setHosts(store.hosts);
+    setEmailDrafts(
+      Object.fromEntries(
+        store.hosts.map((host) => [host.personId, host.email ?? ""]),
+      ),
+    );
   };
 
   const parseDirectory = async (res: Response): Promise<DirectoryStore> => {
@@ -101,7 +115,7 @@ const DirectoryPanel = () => {
   }, [pendingDelete, busy]);
 
   const postAction = async (
-    body: Record<string, string>,
+    body: Record<string, unknown>,
     okHint: string,
   ): Promise<boolean> => {
     setBusy(true);
@@ -135,17 +149,44 @@ const DirectoryPanel = () => {
   };
 
   const handleCreateHost = (orgIndexCode: string) => {
-    const name = (hostDrafts[orgIndexCode] ?? "").trim();
+    const draft = hostDrafts[orgIndexCode] ?? emptyHostDraft();
+    const name = draft.personName.trim();
     if (!name) return;
     void postAction(
       {
         action: "createHost",
         orgIndexCode,
         personName: name,
+        email: draft.email.trim(),
       },
       "已新增被訪人",
     ).then((ok) => {
-      if (ok) setHostDrafts((prev) => ({ ...prev, [orgIndexCode]: "" }));
+      if (ok) {
+        setHostDrafts((prev) => ({
+          ...prev,
+          [orgIndexCode]: emptyHostDraft(),
+        }));
+      }
+    });
+  };
+
+  const handleSaveHostEmail = (host: DirectoryHost) => {
+    const email = (emailDrafts[host.personId] ?? "").trim();
+    if (email === (host.email ?? "").trim()) return;
+    void postAction(
+      {
+        action: "updateHostEmail",
+        personId: host.personId,
+        email,
+      },
+      "已更新通知信箱",
+    ).then((ok) => {
+      if (!ok) {
+        setEmailDrafts((prev) => ({
+          ...prev,
+          [host.personId]: host.email ?? "",
+        }));
+      }
     });
   };
 
@@ -163,161 +204,211 @@ const DirectoryPanel = () => {
   };
 
   return (
-    <div className="relative space-y-4">
-      <p className="text-sm text-slate-500">
-        被訪人掛在部門底下。現場預約會先選部門，再選該部門的人。
-      </p>
+    <>
+      <div className="space-y-4">
+        <p className="text-sm text-slate-500">
+          先新增部門，再加入被訪人與通知信箱。預約成立後會通知該被訪人，並一併寄給設定頁的總機固定通知。
+        </p>
 
-      <div className="flex gap-2">
-        <input
-          className={`${FIELD} min-h-12`}
-          value={orgName}
-          onChange={(e) => setOrgName(e.target.value)}
-          maxLength={40}
-          placeholder="部門名稱，例如：總務部"
-          aria-label="新增部門名稱"
-          onKeyDown={(e) => {
-            if (e.key === "Enter") handleCreateOrg();
-          }}
-        />
-        <button
-          type="button"
-          className={`${BTN_DARK} min-h-12 shrink-0 px-4`}
-          aria-label="新增部門"
-          disabled={busy || !orgName.trim()}
-          onClick={handleCreateOrg}
-        >
-          新增部門
-        </button>
-      </div>
-
-      {loading ? (
-        <p className="text-base text-slate-500">載入人員目錄…</p>
-      ) : orgs.length === 0 ? (
-        <div className="flex min-h-36 items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 px-6 text-center">
-          <p className="text-base text-slate-500">
-            尚無部門。請先新增部門，再於部門底下加入被訪人。
-          </p>
+        <div className="flex gap-2">
+          <input
+            className={`${FIELD} min-h-12`}
+            value={orgName}
+            onChange={(e) => setOrgName(e.target.value)}
+            maxLength={40}
+            placeholder="部門名稱，例如：總務部"
+            aria-label="新增部門名稱"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleCreateOrg();
+            }}
+          />
+          <button
+            type="button"
+            className={`${BTN_DARK} min-h-12 shrink-0 px-4`}
+            aria-label="新增部門"
+            disabled={busy || !orgName.trim()}
+            onClick={handleCreateOrg}
+          >
+            新增部門
+          </button>
         </div>
-      ) : (
-        <ul className="space-y-3">
-          {orgs.map((org) => {
-            const orgHosts = hosts.filter(
-              (host) => host.orgIndexCode === org.orgIndexCode,
-            );
-            const draft = hostDrafts[org.orgIndexCode] ?? "";
-            return (
-              <li
-                key={org.orgIndexCode}
-                className="overflow-hidden rounded-2xl border border-slate-200"
-              >
-                <div className="flex items-center gap-3 bg-slate-50 px-4 py-3">
-                  <div className="min-w-0 flex-1">
-                    <h3 className="truncate text-lg font-semibold text-slate-900">
-                      {org.orgName}
-                    </h3>
-                    <p className="text-sm text-slate-500">
-                      {orgHosts.length} 位被訪人
-                    </p>
+
+        {loading ? (
+          <p className="text-base text-slate-500">載入人員目錄…</p>
+        ) : orgs.length === 0 ? (
+          <div className="flex min-h-36 items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 px-6 text-center">
+            <p className="text-base text-slate-500">
+              尚無部門。請先新增部門，再於部門底下加入被訪人。
+            </p>
+          </div>
+        ) : (
+          <ul className="space-y-3">
+            {orgs.map((org) => {
+              const orgHosts = hosts.filter(
+                (host) => host.orgIndexCode === org.orgIndexCode,
+              );
+              const draft = hostDrafts[org.orgIndexCode] ?? emptyHostDraft();
+              return (
+                <li
+                  key={org.orgIndexCode}
+                  className="overflow-hidden rounded-2xl border border-slate-200"
+                >
+                  <div className="flex items-center gap-3 bg-slate-50 px-4 py-3">
+                    <div className="min-w-0 flex-1">
+                      <h3 className="truncate text-lg font-semibold text-slate-900">
+                        {org.orgName}
+                      </h3>
+                      <p className="text-sm text-slate-500">
+                        {orgHosts.length} 位被訪人
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className={BTN_DANGER}
+                      aria-label={`刪除部門 ${org.orgName}`}
+                      disabled={busy}
+                      onClick={() =>
+                        setPendingDelete({
+                          kind: "org",
+                          orgIndexCode: org.orgIndexCode,
+                          orgName: org.orgName,
+                        })
+                      }
+                    >
+                      刪除部門
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    className={BTN_DANGER}
-                    aria-label={`刪除部門 ${org.orgName}`}
-                    disabled={busy}
-                    onClick={() =>
-                      setPendingDelete({
-                        kind: "org",
-                        orgIndexCode: org.orgIndexCode,
-                        orgName: org.orgName,
-                      })
-                    }
-                  >
-                    刪除部門
-                  </button>
-                </div>
 
-                <ul className="border-t border-l-4 border-slate-200 border-l-blue-200">
-                  {orgHosts.length === 0 ? (
-                    <li className="px-4 py-3 text-sm text-slate-500">
-                      此部門尚無被訪人
-                    </li>
-                  ) : (
-                    orgHosts.map((host) => (
-                      <li
-                        key={host.personId}
-                        className="flex items-center gap-2 border-b border-slate-100 px-4 last:border-b-0"
-                      >
-                        <span className="min-h-12 min-w-0 flex-1 py-2 text-base text-slate-800">
-                          {host.personName}
-                        </span>
-                        <button
-                          type="button"
-                          className={BTN_DANGER}
-                          aria-label={`刪除被訪人 ${host.personName}`}
-                          disabled={busy}
-                          onClick={() =>
-                            setPendingDelete({
-                              kind: "host",
-                              personId: host.personId,
-                              personName: host.personName,
-                            })
-                          }
-                        >
-                          刪除
-                        </button>
+                  <ul className="border-t border-slate-200">
+                    {orgHosts.length === 0 ? (
+                      <li className="px-4 py-3 text-sm text-slate-500">
+                        此部門尚無被訪人
                       </li>
-                    ))
-                  )}
-                </ul>
+                    ) : (
+                      orgHosts.map((host) => {
+                        const emailDraft =
+                          emailDrafts[host.personId] ?? host.email ?? "";
+                        return (
+                          <li
+                            key={host.personId}
+                            className="flex flex-col gap-2 border-b border-slate-100 px-4 py-3 last:border-b-0 sm:flex-row sm:items-center"
+                          >
+                            <span className="w-28 shrink-0 truncate text-base font-medium text-slate-800 sm:w-32">
+                              {host.personName}
+                            </span>
+                            <input
+                              className={`${FIELD} min-h-11 flex-1 text-sm`}
+                              type="email"
+                              value={emailDraft}
+                              onChange={(e) =>
+                                setEmailDrafts((prev) => ({
+                                  ...prev,
+                                  [host.personId]: e.target.value,
+                                }))
+                              }
+                              onBlur={() => handleSaveHostEmail(host)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.currentTarget.blur();
+                                }
+                              }}
+                              placeholder="通知信箱（選填）"
+                              aria-label={`${host.personName} 通知信箱`}
+                              disabled={busy}
+                            />
+                            <button
+                              type="button"
+                              className={`${BTN_DANGER} shrink-0 self-end sm:self-auto`}
+                              aria-label={`刪除被訪人 ${host.personName}`}
+                              disabled={busy}
+                              onClick={() =>
+                                setPendingDelete({
+                                  kind: "host",
+                                  personId: host.personId,
+                                  personName: host.personName,
+                                })
+                              }
+                            >
+                              刪除
+                            </button>
+                          </li>
+                        );
+                      })
+                    )}
+                  </ul>
 
-                <div className="flex gap-2 border-t border-slate-200 bg-white p-3">
-                  <input
-                    className={`${FIELD} min-h-11`}
-                    value={draft}
-                    onChange={(e) =>
-                      setHostDrafts((prev) => ({
-                        ...prev,
-                        [org.orgIndexCode]: e.target.value,
-                      }))
-                    }
-                    maxLength={40}
-                    placeholder={`新增「${org.orgName}」的被訪人`}
-                    aria-label={`新增 ${org.orgName} 被訪人姓名`}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") handleCreateHost(org.orgIndexCode);
-                    }}
-                  />
-                  <button
-                    type="button"
-                    className={`${BTN_DARK} shrink-0`}
-                    aria-label={`新增 ${org.orgName} 被訪人`}
-                    disabled={busy || !draft.trim()}
-                    onClick={() => handleCreateHost(org.orgIndexCode)}
-                  >
-                    新增
-                  </button>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+                  <div className="flex flex-col gap-2 border-t border-slate-200 bg-slate-50/60 p-3 sm:flex-row">
+                    <input
+                      className={`${FIELD} min-h-11 sm:w-36 sm:flex-none`}
+                      value={draft.personName}
+                      onChange={(e) =>
+                        setHostDrafts((prev) => ({
+                          ...prev,
+                          [org.orgIndexCode]: {
+                            ...draft,
+                            personName: e.target.value,
+                          },
+                        }))
+                      }
+                      maxLength={40}
+                      placeholder="姓名"
+                      aria-label={`新增 ${org.orgName} 被訪人姓名`}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter")
+                          handleCreateHost(org.orgIndexCode);
+                      }}
+                    />
+                    <input
+                      className={`${FIELD} min-h-11 flex-1`}
+                      type="email"
+                      value={draft.email}
+                      onChange={(e) =>
+                        setHostDrafts((prev) => ({
+                          ...prev,
+                          [org.orgIndexCode]: {
+                            ...draft,
+                            email: e.target.value,
+                          },
+                        }))
+                      }
+                      placeholder="通知信箱（選填）"
+                      aria-label={`新增 ${org.orgName} 被訪人信箱`}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter")
+                          handleCreateHost(org.orgIndexCode);
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className={`${BTN_DARK} shrink-0`}
+                      aria-label={`新增 ${org.orgName} 被訪人`}
+                      disabled={busy || !draft.personName.trim()}
+                      onClick={() => handleCreateHost(org.orgIndexCode)}
+                    >
+                      新增
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
 
-      {error ? (
-        <p className="text-base text-red-600" role="alert">
-          {error}
-        </p>
-      ) : null}
-      {hint ? (
-        <p className="text-base text-emerald-700" role="status">
-          {hint}
-        </p>
-      ) : null}
+        {error ? (
+          <p className="text-base text-red-600" role="alert">
+            {error}
+          </p>
+        ) : null}
+        {hint ? (
+          <p className="text-base text-emerald-700" role="status">
+            {hint}
+          </p>
+        ) : null}
+      </div>
 
       {pendingDelete ? (
         <div
-          className="absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-black/40 p-4"
+          className="fixed inset-0 z-60 flex items-center justify-center bg-black/50 p-4"
           role="presentation"
           onClick={() => {
             if (!busy) setPendingDelete(null);
@@ -366,7 +457,7 @@ const DirectoryPanel = () => {
           </div>
         </div>
       ) : null}
-    </div>
+    </>
   );
 };
 
@@ -377,6 +468,7 @@ export const DirectoryDialog = ({ open, onClose }: DirectoryDialogProps) => (
     title="部門與被訪人"
     closeLabel="關閉部門與被訪人"
     maxWidthClass="max-w-2xl"
+    maxHeightClass="max-h-[70vh]"
   >
     <DirectoryPanel />
   </KioskDialog>

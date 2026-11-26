@@ -16,7 +16,7 @@ export type KioskSettings = {
   logoFileName: string;
   /** 訪客須知影片：YouTube／影片網址／路徑；空＝/notice.mp4 */
   noticeVideoUrl: string;
-  /** 預約完成時通知的固定信箱（空＝不寄內部信） */
+  /** 總機固定 CC：每次預約併入內部通知（與被訪人信箱去重；全空則不寄） */
   approverEmails: string[];
   /** 是否開放 /book 外部預約 */
   publicBookingEnabled: boolean;
@@ -245,7 +245,7 @@ export const toSettingsView = (settings: KioskSettings) => ({
   publicBookingEnabled: settings.publicBookingEnabled,
 });
 
-/** 管理員視圖：含固定通知信箱 */
+/** 管理員視圖：含總機固定通知信箱 */
 export const toAdminSettingsView = (settings: KioskSettings) => ({
   ...toSettingsView(settings),
   approverEmails: settings.approverEmails,

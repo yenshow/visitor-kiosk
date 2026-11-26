@@ -1,6 +1,7 @@
 import { jsonError, jsonOk, toTaipeiIso } from "@/lib/kiosk/api-helpers";
 import { normalizePhoneDigits, normalizePlateNo } from "@/lib/kiosk/normalize";
 import { checkInVisit, VisitStateConflict } from "@/lib/kiosk/visit-actions";
+import { requireVisitorLicense } from "@/lib/license/gate";
 import {
   consumeCheckinToken,
   peekCheckinToken,
@@ -13,6 +14,9 @@ type CheckinBody = {
 };
 
 export const POST = async (request: Request) => {
+  const denied = await requireVisitorLicense();
+  if (denied) return denied;
+
   try {
     const body = (await request.json()) as CheckinBody;
 

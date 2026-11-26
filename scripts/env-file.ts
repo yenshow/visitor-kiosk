@@ -5,7 +5,7 @@ import os from "os";
 export const readUtf8 = (filePath: string): string =>
   readFileSync(filePath, "utf8").replace(/^\uFEFF/, "");
 
-export const writeUtf8 = (filePath: string, text: string) => {
+const writeUtf8 = (filePath: string, text: string) => {
   const tmp = `${filePath}.tmp`;
   writeFileSync(tmp, text.replace(/^\uFEFF/, ""), { encoding: "utf8" });
   renameSync(tmp, filePath);
@@ -33,28 +33,21 @@ export const loadDotEnv = (
   }
 };
 
-export const upsertEnvLine = (
+export const updateEnvFile = (
   envPath: string,
-  key: string,
-  value: string,
+  changes: Record<string, string | null>,
 ) => {
-  const line = `${key}=${value}`;
-  let text = existsSync(envPath) ? readUtf8(envPath) : "";
-  const re = new RegExp(`^${key}=.*$`, "m");
-  text = re.test(text)
-    ? text.replace(re, line)
-    : `${text.replace(/\s*$/, "")}\n${line}\n`;
-  writeUtf8(envPath, text);
-  process.env[key] = value;
-};
-
-/** 刪除 .env 中的鍵（含相鄰空白行整理由呼叫端決定） */
-export const removeEnvLine = (envPath: string, key: string) => {
-  if (!existsSync(envPath)) return;
-  const re = new RegExp(`^${key}=.*\\r?\\n?`, "m");
-  const text = readUtf8(envPath).replace(re, "");
-  writeUtf8(envPath, text);
-  delete process.env[key];
+  const previous = existsSync(envPath) ? readUtf8(envPath) : "";
+  const lines = previous.split(/\r?\n/).filter((line) => {
+    const key = /^\s*([\w]+)\s*=/.exec(line)?.[1];
+    return !key || !Object.hasOwn(changes, key);
+  });
+  const updated = Object.entries(changes).flatMap(([key, value]) =>
+    value === null ? [] : [`${key}=${value}`],
+  );
+  const newline = previous.includes("\r\n") ? "\r\n" : "\n";
+  const body = lines.join(newline).trimEnd();
+  writeUtf8(envPath, [...(body ? [body] : []), ...updated, ""].join(newline));
 };
 
 export const listLanIps = (): string[] => {
